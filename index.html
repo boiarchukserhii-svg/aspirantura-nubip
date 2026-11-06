@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="uk">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; manifest-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#195bb5">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Аспірантура НУБіП</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eff4fa;color:#203752;font:15px/1.5 system-ui,sans-serif}main{max-width:1320px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px;background:linear-gradient(120deg,#143b74,#195bb5);color:white;padding:28px;border-radius:20px}h1{font-size:clamp(25px,4vw,40px);margin:0;letter-spacing:-.03em}header p{margin:5px 0 0;color:#e0ecff}.eyebrow{font-size:12px;font-weight:750;letter-spacing:.12em}.metrics,.filters{display:grid;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr))}.metrics{margin:16px 0}.metric,.panel{background:white;border:1px solid #dce6f1;border-radius:15px}.metric{padding:13px 16px}.metric strong{display:block;font-size:25px;color:#153f78}.panel{padding:16px}.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:8px;padding:9px 13px;background:#e9f1fc;color:#15447f;font-weight:650}button[aria-pressed=true],.primary{background:#195bb5;color:white}header .primary{background:white;color:#164580;white-space:nowrap}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #719ee5;outline-offset:2px}.filters label{font-weight:620;font-size:13px}input,select{display:block;width:100%;margin-top:4px;padding:8px;border:1px solid #cbd9e9;border-radius:8px;background:white;color:inherit}#notice{min-height:1.5em;margin:10px 0;color:#415a79}#notice.error{color:#a52626}.scroll{overflow:auto;max-height:60vh}table{width:100%;border-collapse:collapse;text-align:left}td,th{padding:9px 10px;border-bottom:1px solid #e5edf7;vertical-align:top}th{position:sticky;top:0;background:#f3f7fd;z-index:1}th button,td button{padding:0;background:none;text-align:left}td button{text-decoration:underline;text-underline-offset:3px}.pill{display:inline-block;padding:2px 8px;border-radius:12px;background:#e8f0fd;white-space:nowrap}.urgent{background:#ffe5e1;color:#83291e}.review{background:#fff0d5;color:#754b05}dialog{border:1px solid #ccdced;border-radius:16px;width:min(720px,calc(100% - 26px));max-height:85vh;color:inherit;padding:20px}dialog::backdrop{background:#11294a8a}dialog h2{margin:0}dialog form{float:right;margin-left:10px}dl{display:grid;grid-template-columns:minmax(135px,1fr) 2fr;gap:8px 14px}dt{font-weight:650}dd{margin:0;overflow-wrap:anywhere}[hidden]{display:none!important}@media(max-width:760px){main{padding:12px}header{align-items:flex-start;flex-direction:column;padding:20px}.metrics,.filters{grid-template-columns:repeat(2,minmax(0,1fr))}td,th{min-width:115px}}@media(max-width:390px){.filters{grid-template-columns:1fr}}
+body{background:#f6f7f5;color:#202621}header{background:#eef1ed;color:#18231c;border-radius:22px}header p{color:#526058}header .primary,button[aria-pressed=true],.primary{background:#176447;color:white}.eyebrow,.brandIcon{color:#176447}.brandIcon{display:inline-flex;vertical-align:middle;margin-right:9px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric,.panel{border-color:#dce4dc}.metric{padding:16px 18px;min-height:112px}.metric strong{color:#18231c;font-size:32px}.metricIcon{display:block;width:24px;height:24px;color:#176447}.metric:nth-child(2) .metricIcon{color:#89501c}.metric:nth-child(3) .metricIcon{color:#18658d}.metric:nth-child(4) .metricIcon{color:#9f382f}.overview{background:#eef1ed;padding:14px;border-radius:20px;margin:16px 0}.overview .metrics{margin:0 0 12px}.courseChart{background:#fff;border-radius:15px;padding:14px 18px}.courseChart h2{margin:0 0 10px;font-size:clamp(18px,4vw,23px)}.courseRow{display:grid;grid-template-columns:70px 1fr 36px;gap:12px;align-items:center;margin:8px 0}.courseRow progress{width:100%;height:12px;appearance:none;border:0;border-radius:10px;overflow:hidden;background:#edf0ed;color:#438768}.courseRow progress::-webkit-progress-bar{background:#edf0ed}.courseRow progress::-webkit-progress-value{background:#438768}.courseRow progress::-moz-progress-bar{background:#438768}.courseRow b{text-align:right}.summaryLine{margin:12px 3px 0;color:#526058}.profileHead{display:flex;align-items:flex-start;gap:13px;padding-bottom:14px;border-bottom:1px solid #e5ebe5}.avatar{background:#eef1ed;color:#526058;border-radius:15px;display:grid;place-items:center;width:56px;height:56px;flex:none}.profileHead h2{line-height:1.16;font-size:clamp(19px,4.4vw,28px);overflow-wrap:anywhere}.profileHead p{margin:5px 0;color:#526058}.profileBadges{display:flex;gap:6px;flex-wrap:wrap}.profileBadges .pill{background:#edf0ed}.profileBadges .active{background:#d9f1e2;color:#14613f}.profileBadges .leave{background:#fff0d5;color:#754b05}.profileBadges .done{background:#e3eff9;color:#185781}.profileBadges .dismissed{background:#ffe5e1;color:#83291e}.profileFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 16px;margin:14px 0}.profileFacts dt{color:#526058;font-size:13px;font-weight:500}.profileFacts dd{font-weight:650}.deadlineBox{background:#eef3ee;border-radius:14px;padding:13px 15px;margin:12px 0}.deadlineBox h3,.deadlineBox p{margin:0}.deadlineBox h3{margin-bottom:4px}.deadlineBox svg{vertical-align:middle;color:#176447;margin-right:6px}.cardClose{float:right;margin-left:6px}#cardTabs{margin:12px 0 0}#cardTabs:empty{display:none}button:disabled{opacity:.55;cursor:default}@media(max-width:430px){.metric{padding:11px;min-height:104px}.metric strong{font-size:27px}.overview{padding:10px}.avatar{width:43px;height:43px}.courseChart{padding:12px}dialog{padding:13px}}
+</style>
+<main>
+<header><div><div class="eyebrow">НУБіП УКРАЇНИ</div><h1><span id="brandIcon" class="brandIcon"></span>Аспірантура НУБіП</h1><p>Контингент, академічні відпустки та контроль строків</p></div>
+<button id="pick" class="primary">Імпортувати Excel</button><input id="files" type="file" accept=".xlsx" multiple hidden></header>
+<div id="notice" role="status">Виберіть обидва експорти Excel. Файли обробляються у браузері.</div>
+<section class="overview" aria-label="Огляд контингенту">
+<div class="metrics" id="metrics"></div>
+<div class="courseChart"><h2>Контингент за роками навчання</h2><div id="courses"></div></div>
+<p class="summaryLine" id="summary"></p>
+</section>
+<section class="panel">
+<nav class="toolbar" aria-label="Розділи"><button id="registryTab" aria-pressed="true">Реєстр</button><button id="calendarTab" aria-pressed="false">Календар строків</button></nav>
+<div class="toolbar"><button id="export">Експорт до Excel (CSV)</button><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
+<div class="toolbar" id="installation" hidden><button id="install">Встановити застосунок</button><span id="installHelp" hidden></span></div>
+<div id="registry">
+<div class="filters" id="filters"><label>Пошук за ПІБ<input id="search" type="search" placeholder="Введіть ім’я або прізвище"></label></div>
+<p id="result"></p><div class="scroll"><table><thead id="registryHead"></thead><tbody id="registryBody"></tbody></table></div>
+</div>
+<div id="calendar" hidden>
+<p>Календар показує строки до 90 днів, прострочені дати й записи для звірки.</p>
+<label>Станом на <input id="asOf" type="date" style="max-width:180px"></label>
+<p id="eventCount"></p><div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="eventBody"></tbody></table></div>
+</div>
+</section>
+</main>
+<dialog id="card"><button class="cardClose" id="closeCard">Закрити</button>
+<div class="profileHead"><span id="avatar" class="avatar"></span><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div></div>
+<div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
+<section class="deadlineBox" id="profileDeadline"></section><details><summary>Інші відомості та зміна статусу</summary><dl id="details"></dl></details>
+</dialog>
+<script>
+"use strict";
+const ACTIVE = "Навчається", LEAVE = "Академічна відпустка";
+const COMPLETED = "Завершив(-ла) навчання", DISMISSED = "Відраховано";
+const statuses = [ACTIVE,LEAVE,COMPLETED,DISMISSED];
+const storageKey = "aspirantura-nubip.registry.v1";
+const leaveStatuses = new Set(["Надано академвідпустку", "Продовжено академвідпустку"]);
+const fields = ["ID картки","ID ФО","Здобувач","Дата народження","Курс","Структурний підрозділ","Спеціальність","ID ОП","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання","Початок навчання","Завершення навчання"];
+const leaveFields = ["Статус по","Підстави надання академічної відпустки"];
+const dateFields = new Set(["Дата народження","Початок навчання","Завершення навчання","Статус по"]);
+const filterFields = ["Контингент","Курс","Структурний підрозділ","Спеціальність","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання"];
+const columns = ["Здобувач","Курс","Структурний підрозділ","Спеціальність","Освітня програма","Контингент"];
+const MS_DAY = 86400000;
+const decoder = new TextDecoder();
+
+function openZip(buffer) {
+  const bytes = new Uint8Array(buffer), view = new DataView(buffer);
+  const u16 = offset => view.getUint16(offset,true);
+  const u32 = offset => view.getUint32(offset,true);
+  let end = bytes.length - 22;
+  while (end >= Math.max(0, bytes.length - 65557)) {
+    if (u32(end) === 0x06054b50 && end + 22 + u16(end+20) === bytes.length) break;
+    end--;
+  }
+  if (end < Math.max(0,bytes.length-65557)) throw new Error("Файл не є доступною книгою XLSX.");
+  const entries = new Map();
+  let offset = u32(end+16);
+  for (let i=0; i<u16(end+10); i++) {
+    if (u32(offset) !== 0x02014b50) throw new Error("Пошкоджено структуру XLSX.");
+    const length = u16(offset+28), name = decoder.decode(bytes.subarray(offset+46,offset+46+length));
+    entries.set(name,{method:u16(offset+10),size:u32(offset+20),start:u32(offset+42)});
+    offset += 46+length+u16(offset+30)+u16(offset+32);
+  }
+  return async name => {
+    const entry = entries.get(name);
+    if (!entry) return null;
+    if (u32(entry.start) !== 0x04034b50) throw new Error("Пошкоджено запис XLSX.");
+    const start = entry.start+30+u16(entry.start+26)+u16(entry.start+28);
+    const data = bytes.subarray(start,start+entry.size);
+    if (entry.method === 0) return decoder.decode(data);
+    if (entry.method !== 8 || typeof DecompressionStream === "undefined") {
+      throw new Error("Для цього XLSX відкрийте застосунок в актуальному Edge або Chrome.");
+    }
+    return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  };
+}
+
+function xml(text) {
+  const doc = new DOMParser().parseFromString(text,"application/xml");
+  if (doc.getElementsByTagName("parsererror").length) throw new Error("Не вдалося прочитати структуру XLSX.");
+  return doc;
+}
+const tags = (element,name) => [...element.getElementsByTagNameNS("*",name)];
+const stringValue = element => tags(element,"t").filter(t => t.parentElement.localName !== "rPh").map(t => t.textContent).join("");
+
+async function readExport(file) {
+  const part = openZip(await file.arrayBuffer());
+  const workbook = xml(await part("xl/workbook.xml"));
+  const relationships = xml(await part("xl/_rels/workbook.xml.rels"));
+  const sheet = tags(workbook,"sheet")[0];
+  const id = sheet?.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+  const target = tags(relationships,"Relationship").find(rel => rel.getAttribute("Id") === id)?.getAttribute("Target");
+  if (!target) throw new Error("У книзі немає аркуша для імпорту.");
+  const sheetPath = new URL(target,"https://local.invalid/xl/workbook.xml").pathname.slice(1);
+  const shared = await part("xl/sharedStrings.xml");
+  const strings = shared ? tags(xml(shared),"si").map(stringValue) : [];
+  const date1904 = ["true","1"].includes(tags(workbook,"workbookPr")[0]?.getAttribute("date1904"));
+  const rows = tags(xml(await part(sheetPath)),"row").map(row => new Map(tags(row,"c").map(cell => {
+    const address = cell.getAttribute("r").replace(/[0-9]+$/,"");
+    const raw = tags(cell,"v")[0]?.textContent;
+    const type = cell.getAttribute("t");
+    const value = type === "s" ? strings[Number(raw)] : type === "inlineStr" ? stringValue(cell)
+      : raw == null ? null : !type || type === "n" ? Number(raw) : raw;
+    return [address,value === "" ? null : value];
+  })));
+  const header = new Map([...rows.shift() ?? []].map(([address,name]) => [String(name).trim(),address]));
+  const missing = fields.filter(field => !header.has(field));
+  if (missing.length) throw new Error("Відсутні колонки · "+missing.join(", "));
+  const result = [];
+  for (const [index,row] of rows.entries()) {
+    if (![...row.values()].some(value => value != null)) continue;
+    const card = Object.fromEntries([...fields,...leaveFields].map(field => [field,row.get(header.get(field)) ?? null]));
+    for (const key of ["ID картки","ID ФО"]) {
+      if (!Number.isSafeInteger(card[key]) || card[key] <= 0) throw new Error(`Рядок ${index+2} · некоректне поле «${key}».`);
+    }
+    const sourceStatus = String(card["Статус навчання"] ?? "").trim().toLocaleLowerCase("uk");
+    card["Контингент"] = leaveStatuses.has(card["Статус навчання"]) ? LEAVE
+      : /^відрахован/.test(sourceStatus) ? DISMISSED
+      : /^завершено навчання|^закінчено навчання|^випущено|^випуск$/.test(sourceStatus) ? COMPLETED : ACTIVE;
+    if (card["Контингент"] === LEAVE && !header.has("Статус по")) throw new Error("Потрібна колонка «Статус по».");
+    for (const field of dateFields) {
+      const value = card[field];
+      if (value == null) continue;
+      const time = typeof value === "number"
+        ? Date.UTC(date1904 ? 1904 : 1899,date1904 ? 0 : 11,date1904 ? 1 : 30) + Math.floor(value)*MS_DAY
+        : /^\d{4}-\d{2}-\d{2}/.test(value) ? Date.parse(value.slice(0,10)) : NaN;
+      if (!Number.isFinite(time)) throw new Error(`Рядок ${index+2} · некоректна дата в полі «${field}».`);
+      card[field] = new Date(time).toISOString().slice(0,10);
+    }
+    result.push(card);
+  }
+  if (!result.length) throw new Error("У файлі немає навчальних карток.");
+  return result;
+}
+
+async function readFiles(files) {
+  const merged = new Map();
+  for (const file of files) {
+    for (const record of await readExport(file)) {
+      const key = record["ID картки"];
+      if (merged.has(key) && JSON.stringify(merged.get(key)) !== JSON.stringify(record)) {
+        throw new Error("Експорти містять різні дані для однієї навчальної картки.");
+      }
+      merged.set(key,record);
+    }
+  }
+  return [...merged.values()];
+}
+
+function deadlines(cards,asOf) {
+  const today = Date.parse(asOf);
+  const events = [];
+  for (const card of cards) {
+    if (card["Контингент"] === COMPLETED || card["Контингент"] === DISMISSED) continue;
+    const end = card["Завершення навчання"];
+    const leave = card["Контингент"] === LEAVE ? card["Статус по"] : null;
+    const dates = [["Завершення навчання",end]];
+    if (card["Контингент"] === LEAVE) dates.push(["Закінчення академвідпустки",leave]);
+    for (const [name,due] of dates) {
+      const days = (Date.parse(due)-today)/MS_DAY;
+      const review = !due || (name === "Завершення навчання" && leave && due < leave);
+      if (!review && days > 90) continue;
+      const status = !due ? "Немає дати" : review ? "Звірити з наказом" : days < 0 ? "Прострочено"
+        : days === 0 ? "Сьогодні" : `До ${[7,14,30,90].find(limit => days <= limit)} днів`;
+      events.push({card,name,due,status,review:Boolean(review),urgent:!review && days<=0});
+    }
+  }
+  return events.sort((a,b) => a.review-b.review || (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+}
+
+const $ = id => document.getElementById(id);
+const collator = new Intl.Collator("uk",{numeric:true,sensitivity:"base"});
+const count = value => value.toLocaleString("uk");
+const formatDate = value => value ? value.split("-").reverse().join(".") : "—";
+function display(record,field) {
+  if (field === "Освітня програма") return record["ID ОП"] && record[field]
+    ? `${record[field]} · ${record["ID ОП"]}` : "Потребує уточнення";
+  if (dateFields.has(field)) return formatDate(record[field]);
+  return record[field] ?? "—";
+}
+function el(tag,text) {
+  const node = document.createElement(tag);
+  if (text != null) node.textContent = text;
+  return node;
+}
+function personCount(records) { return new Set(records.map(card => card["ID ФО"])).size; }
+const iconPaths = {
+  cap:"M2 9l10-5 10 5-10 5-10-5zm4 2v5c4 3 8 3 12 0v-5m4-2v6",
+  people:"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m14-15a4 4 0 0 1 0 8m6 7v-2a4 4 0 0 0-3-4M13 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0z",
+  calendar:"M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm-2 5h18M8 3v4m8-4v4m-7 8 2 2 4-4",
+  bell:"M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0",
+  person:"M5 21a7 7 0 0 1 14 0m-3-13a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"
+};
+function icon(name,className = "") {
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns,"svg"), path = document.createElementNS(ns,"path");
+  for (const [key,value] of Object.entries({viewBox:"0 0 24 24",width:24,height:24,fill:"none",stroke:"currentColor",
+    "stroke-width":1.7,"stroke-linecap":"round","stroke-linejoin":"round","aria-hidden":"true",class:className})) svg.setAttribute(key,value);
+  path.setAttribute("d",iconPaths[name]); svg.append(path); return svg;
+}
+let cards = [], sortField = "Здобувач", descending = false;
+const filters = new Map();
+
+function renderMetrics() {
+  const active = cards.filter(c => c["Контингент"] === ACTIVE);
+  const leave = cards.filter(c => c["Контингент"] === LEAVE);
+  const year = Number($("asOf").value.slice(0,4) || new Date().getFullYear())+1;
+  const needsAttention = new Set(deadlines(cards,$("asOf").value).map(event => event.card["ID картки"]));
+  const ending = active.filter(c => c["Завершення навчання"]?.startsWith(String(year)));
+  const values = [[active.length,"Навчаються","people"],[leave.length,"Академічні відпустки","calendar"],
+    [ending.length,`Завершують у ${year}`,"cap"],[needsAttention.size,"Потребують уваги","bell"]];
+  $("metrics").replaceChildren(...values.map(([number,label,symbol]) => {
+    const box = el("div"); box.className = "metric"; box.append(icon(symbol,"metricIcon"),el("strong",count(number)),el("span",label)); return box;
+  }));
+  const courses = new Map([1,2,3,4].map(course => [course,0]));
+  for (const card of active) {
+    const course = card["Курс"];
+    if (Number.isInteger(course) && course > 0) courses.set(course,(courses.get(course) ?? 0)+1);
+  }
+  $("courses").replaceChildren(...[...courses].sort(([a],[b]) => a-b).map(([course,total]) => {
+    const row = el("div"), bar = el("progress");
+    row.className = "courseRow"; bar.value = total; bar.max = Math.max(1,...courses.values());
+    bar.setAttribute("aria-label",`${course}-й рік`);
+    row.append(el("span",`${course}-й рік`),bar,el("b",count(total))); return row;
+  }));
+  $("summary").textContent = `${count(personCount(cards))} осіб · ${count(cards.length)} карток · ${count(cards.filter(c => c["Контингент"] === COMPLETED).length)} завершили навчання · ${count(cards.filter(c => c["Контингент"] === DISMISSED).length)} відраховано`;
+}
+function nameButton(record) {
+  const button = el("button",display(record,"Здобувач"));
+  button.onclick = () => openCard(record);
+  return button;
+}
+function renderRegistry() {
+  const query = $("search").value.trim().toLocaleLowerCase("uk");
+  const matches = cards.filter(card => String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
+    && [...filters].every(([field,select]) => !select.value || select.value === String(display(card,field))));
+  matches.sort((a,b) => (descending ? -1 : 1)*collator.compare(display(a,sortField),display(b,sortField)));
+  $("result").textContent = cards.length ? `У вибірці ${count(personCount(matches))} осіб · ${count(matches.length)} карток` : "Імпортуйте Excel, щоб переглянути реєстр.";
+  $("registryBody").replaceChildren(...matches.map(record => {
+    const row = el("tr");
+    for (const field of columns) {
+      const cell = el("td");
+      cell.append(field === "Здобувач" ? nameButton(record) : String(display(record,field)));
+      row.append(cell);
+    }
+    return row;
+  }));
+  for (const header of $("registryHead").rows[0].cells) {
+    header.setAttribute("aria-sort",header.dataset.field === sortField ? descending ? "descending" : "ascending" : "none");
+  }
+}
+function renderCalendar() {
+  const events = $("asOf").value ? deadlines(cards,$("asOf").value) : [];
+  $("eventCount").textContent = `Подій і записів для перевірки · ${count(events.length)}`;
+  $("eventBody").replaceChildren(...events.map(event => {
+    const row = el("tr"), person = el("td"), status = el("td"), pill = el("span",event.status);
+    person.append(nameButton(event.card));
+    pill.className = "pill "+(event.urgent ? "urgent" : event.review ? "review" : "");
+    status.append(pill);
+    row.append(person,el("td",event.name),el("td",formatDate(event.due)),status);
+    return row;
+  }));
+}
+function openCard(selected) {
+  const related = cards.filter(card => card["ID ФО"] === selected["ID ФО"]);
+  $("person").textContent = display(selected,"Здобувач");
+  function select(record) {
+    const currentStatus = record["Контингент"];
+    $("profileLine").textContent = "Доктор філософії · "+display(record,"Курс")+"-й рік навчання";
+    const badge = el("span",currentStatus), form = el("span",display(record,"Форма навчання"));
+    badge.className = "pill "+["active","leave","done","dismissed"][statuses.indexOf(currentStatus)];
+    form.className = "pill";
+    $("profileBadges").replaceChildren(badge,form);
+    const factFields = [["Початок навчання","Дата початку навчання"],["Завершення навчання","Завершення навчання"],
+      ["Спеціальність","Спеціальність"],["Освітня програма","Освітньо-наукова програма"]];
+    $("profileFacts").replaceChildren(...factFields.map(([field,label]) => {
+      const fact = el("div"); fact.append(el("dt",label),el("dd",display(record,field))); return fact;
+    }));
+    const deadline = $("profileDeadline");
+    deadline.hidden = currentStatus === COMPLETED || currentStatus === DISMISSED;
+    const isLeave = currentStatus === LEAVE;
+    const heading = el("h3");
+    heading.append(icon("calendar"),isLeave ? "Контроль академічної відпустки" : "Контроль завершення навчання");
+    const due = record[isLeave ? "Статус по" : "Завершення навчання"];
+    deadline.replaceChildren(heading,el("p",due
+      ? `${isLeave ? "Закінчення відпустки" : "Завершення навчання"} · ${formatDate(due)}. У календарі показано строки за 90, 30, 14 і 7 днів.`
+      : "Дата потребує уточнення."));
+    if (isLeave && due && record["Завершення навчання"] && record["Завершення навчання"] < due) {
+      deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
+    }
+    const status = el("select");
+    status.setAttribute("aria-label","Статус навчальної картки");
+    status.replaceChildren(...statuses.map(value => el("option",value)));
+    status.value = record["Контингент"];
+    status.onchange = () => {
+      const updated = {...record,"Контингент":status.value,manualStatus:true};
+      const saved = saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
+      showNotice(saved ? "Статус картки збережено." : "Статус змінено у вкладці. Збережіть копію реєстру.",!saved);
+      $("card").close();
+      openCard(updated);
+    };
+    const control = el("dd"); control.append(status);
+    $("details").replaceChildren(el("dt","Статус у реєстрі"),control,...["Дата народження",...fields.slice(4),...(record["Контингент"] === LEAVE ? leaveFields : [])]
+      .flatMap(field => [el("dt",field),el("dd",display(record,field))]));
+    for (const button of $("cardTabs").children) button.setAttribute("aria-pressed",button.dataset.key === String(record["ID картки"]));
+  }
+  $("cardTabs").replaceChildren(...related.map(record => {
+    const button = el("button","Картка "+record["ID картки"]);
+    button.dataset.key = record["ID картки"];
+    button.onclick = () => select(record);
+    return button;
+  }));
+  select(selected);
+  $("card").showModal();
+}
+function setCards(next,reset = false) {
+  cards = next;
+  for (const [field,select] of filters) {
+    const previous = select.value;
+    const values = field === "Контингент" ? statuses : [...new Set(cards.map(card => String(display(card,field))))].sort(collator.compare);
+    const all = el("option","Усі"); all.value = "";
+    select.replaceChildren(all,...values.map(value => el("option",value)));
+    if (!reset && values.includes(previous)) select.value = previous;
+  }
+  if (reset) $("search").value = "";
+  $("export").disabled = $("backup").disabled = !cards.length;
+  renderMetrics(); renderRegistry(); renderCalendar();
+}
+function saveCards(next) {
+  setCards(next);
+  try {
+    localStorage.setItem(storageKey,JSON.stringify(next));
+    return true;
+  } catch {
+    return false;
+  }
+}
+function mergeCards(incoming,preserveManual) {
+  const merged = new Map(cards.map(card => [card["ID картки"],card]));
+  for (const card of incoming) {
+    const key = card["ID картки"], old = merged.get(key);
+    if (old && old["ID ФО"] !== card["ID ФО"]) throw new Error("Ідентифікатор картки вже належить іншій особі.");
+    merged.set(key,preserveManual && old?.manualStatus
+      ? {...card,"Контингент":old["Контингент"],manualStatus:true} : card);
+  }
+  return [...merged.values()];
+}
+function showNotice(text,error = false) {
+  $("notice").className = error ? "error" : "";
+  $("notice").textContent = text;
+}
+function download(name,type,content) {
+  const url = URL.createObjectURL(new Blob([content],{type}));
+  const link = el("a"); link.href = url; link.download = name; link.click();
+  setTimeout(() => URL.revokeObjectURL(url),1000);
+}
+function exportRegistry() {
+  const columns = ["Контингент",...fields,...leaveFields];
+  const cell = value => {
+    const text = String(value ?? "");
+    return '"'+(/^[\s]*[=+@-]|^[\t\r\n]/.test(text) ? "'" : "")+text.replaceAll('"','""')+'"';
+  };
+  const rows = [columns,...cards.map(card => columns.map(field => card[field]))];
+  download("Аспірантура НУБіП.csv","text/csv;charset=utf-8","\ufeff"+rows.map(row => row.map(cell).join(";")).join("\r\n"));
+}
+function decodeBackup(data) {
+  if (!Array.isArray(data) || data.some(card => !card || !statuses.includes(card["Контингент"])
+    || !["ID картки","ID ФО"].every(field => Number.isSafeInteger(card[field]) && card[field] > 0)
+    || [...dateFields].some(field => card[field] != null &&
+      (typeof card[field] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(card[field]))))) {
+    throw new Error("Цей файл не є копією реєстру «Аспірантура НУБіП».");
+  }
+  return data;
+}
+function setup() {
+  for (const field of filterFields) {
+    const label = el("label",field), select = el("select");
+    select.onchange = renderRegistry;
+    label.append(select); $("filters").append(label); filters.set(field,select);
+  }
+  const header = el("tr");
+  for (const field of columns) {
+    const cell = el("th"), button = el("button",field);
+    cell.dataset.field = field;
+    button.onclick = () => { descending = sortField === field && !descending; sortField = field; renderRegistry(); };
+    cell.append(button); header.append(cell);
+  }
+  $("registryHead").append(header);
+  $("search").oninput = renderRegistry;
+  const now = new Date();
+  $("asOf").value = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $("asOf").onchange = () => { renderCalendar(); renderMetrics(); };
+  $("brandIcon").append(icon("cap"));
+  $("avatar").append(icon("person"));
+  $("closeCard").onclick = () => $("card").close();
+  for (const name of ["registry","calendar"]) {
+    $(name+"Tab").onclick = () => {
+      for (const section of ["registry","calendar"]) {
+        $(section).hidden = section !== name;
+        $(section+"Tab").setAttribute("aria-pressed",section === name);
+      }
+    };
+  }
+  $("pick").onclick = () => $("files").click();
+  $("export").onclick = exportRegistry;
+  $("backup").onclick = () => download("Аспірантура НУБіП — копія.json","application/json",
+    JSON.stringify({format:storageKey,cards}));
+  $("restore").onclick = () => $("backupFile").click();
+  $("backupFile").onchange = async () => {
+    const file = $("backupFile").files[0];
+    if (!file) return;
+    try {
+      const backup = JSON.parse(await file.text());
+      if (backup?.format !== storageKey) throw new Error();
+      const saved = saveCards(mergeCards(decodeBackup(backup.cards),false));
+      showNotice(saved ? "Копію додано до реєстру." : "Копію відкрито на час роботи у вкладці.",!saved);
+    } catch {
+      showNotice("Не вдалося відкрити копію реєстру. Виберіть JSON, створений у цьому застосунку.",true);
+    } finally { $("backupFile").value = ""; }
+  };
+  $("files").onchange = async () => {
+    const files = [...$("files").files];
+    if (!files.length) return;
+    $("pick").disabled = true;
+    $("notice").className = "";
+    $("notice").textContent = "Читаємо вибрані файли…";
+    try {
+      const saved = saveCards(mergeCards(await readFiles(files),true));
+      showNotice(saved ? `Імпортовано файлів · ${files.length}. Реєстр збережено в цьому браузері.`
+        : "Імпорт завершено. Браузер не зберіг реєстр, збережіть копію перед закриттям.",!saved);
+    } catch (error) {
+      $("notice").className = "error";
+      $("notice").textContent = error instanceof RangeError || error instanceof TypeError
+        ? "Не вдалося прочитати XLSX. Перевірте файл або відкрийте застосунок у сучасному Edge чи Chrome."
+        : error.message;
+    } finally {
+      $("pick").disabled = false;
+      $("files").value = "";
+    }
+  };
+  try {
+    const saved = localStorage.getItem(storageKey);
+    setCards(saved ? decodeBackup(JSON.parse(saved)) : []);
+    if (cards.length) showNotice("Відкрито реєстр, збережений у цьому браузері.");
+  } catch {
+    setCards([]);
+    showNotice("Не вдалося відкрити дані браузера. Імпортуйте Excel або відкрийте копію.",true);
+  }
+}
+setup();
+if (location.protocol === "https:" || location.hostname === "localhost") {
+  $("installation").hidden = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  let installPrompt;
+  window.addEventListener("beforeinstallprompt",event => {
+    event.preventDefault();
+    installPrompt = event;
+  });
+  $("install").onclick = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      installPrompt = null;
+    } else {
+      $("installHelp").textContent = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+        ? "У Safari натисніть «Поділитися» → «На початковий екран»."
+        : "У меню Edge або Chrome виберіть «Встановити застосунок» або «Додати на головний екран».";
+      $("installHelp").hidden = false;
+    }
+  };
+  window.addEventListener("appinstalled",() => { $("installation").hidden = true; });
+  navigator.serviceWorker?.register("./service-worker.js").catch(() => {});
+}
+</script>
+</html>
