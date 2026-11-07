@@ -2,7 +2,7 @@
 <html lang="uk">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; manifest-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'unsafe-inline'; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseapp.com; frame-src https://*.firebaseapp.com https://apis.google.com; manifest-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#195bb5">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icon-192.png">
@@ -120,11 +120,13 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .profileMore>summary{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 13px;border-radius:8px;background:#dceaff;color:#15447f;font-weight:650;cursor:pointer}
 .profileMore>summary::after{content:"+"}.profileMore[open]>summary::after{content:"−"}
 .profileMore>summary:hover{background:#ccdef7}
+.syncTools{align-items:center;margin:10px 0}.syncTools span{font-size:13px;color:#405571}
 @media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{padding-inline:6px}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
 <button id="pick" class="primary">Імпорт</button><input id="files" type="file" accept=".xlsx" multiple hidden></header>
+<div class="toolbar syncTools" id="syncTools" hidden><button id="syncLogin" type="button">Увійти через Google</button><button id="syncLogout" type="button" hidden>Вийти</button><button id="syncTransfer" type="button" hidden>Перенести локальний реєстр</button><span id="syncStatus" role="status"></span></div>
 <div id="notice" role="status">Виберіть обидва експорти Excel. Файли обробляються у браузері.</div>
 <section class="overview" aria-label="Огляд контингенту">
 <div class="metrics" id="metrics"></div>
@@ -187,6 +189,7 @@ const statusActions = [
   {id:"dismiss",label:"Відрахувати",target:DISMISSED}
 ];
 const storageKey = "aspirantura-nubip.registry.v1";
+const sync = {api:null,uid:null,revision:null,ready:false,busy:false,unsubscribe:null};
 const leaveStatuses = new Set(["Надано академвідпустку", "Продовжено академвідпустку"]);
 const fields = ["ID картки","ID ФО","Здобувач","Дата народження","Курс","Структурний підрозділ","Спеціальність","ID ОП","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання","Початок навчання","Завершення навчання"];
 const leaveFields = ["Статус по","Підстави надання академічної відпустки"];
@@ -665,10 +668,16 @@ function editStatus(record) {
   form.oninput = validate;
   form.onchange = validate;
   validate();
-  form.onsubmit = event => {
+  form.onsubmit = async event => {
     event.preventDefault();
+    if (form.dataset.saving) return;
     const action = validate();
     if (!action || !form.reportValidity()) return;
+    const latest = cards.find(card => card["ID картки"] === record["ID картки"]);
+    if (JSON.stringify(latest) !== JSON.stringify(record)) {
+      alert("Цю картку вже оновлено. Відкрийте її з реєстру повторно.");
+      return;
+    }
     const updated = {...record,"Контингент":action.target,manualStatus:true};
     const entry = {action:action.label,from:current,to:action.target,date:$("statusEffective").value,
       orderNumber:$("statusOrderNumber").value.trim(),orderDate:$("statusOrderDate").value};
@@ -680,8 +689,18 @@ function editStatus(record) {
       entry.studyEnd = updated["Завершення навчання"] = $("statusStudyEnd").value;
     }
     updated.statusHistory = [...(record.statusHistory ?? []),entry];
-    const saved = saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
-    showNotice(saved ? "Статус картки збережено." : "Статус змінено у вкладці. Збережіть копію реєстру.",!saved);
+    form.dataset.saving = "true";
+    $("saveStatus").disabled = $("cancelStatus").disabled = true;
+    try {
+      const saved = await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
+      showNotice(saved ? "Статус картки збережено." : "Статус змінено у вкладці. Збережіть копію реєстру.",!saved);
+    } catch (error) {
+      alert(sync.api?.errorText(error) ?? error.message);
+      return;
+    } finally {
+      delete form.dataset.saving;
+      $("saveStatus").disabled = $("cancelStatus").disabled = false;
+    }
     dialog.close();
     $("card").close();
     openCard(updated);
@@ -747,7 +766,7 @@ function openCard(selected) {
     const extraFields = [["Дата народження","Дата народження"],["ID ОП","ID ОНП"],
       ["Статус навчання","Статус у ЄДЕБО"]];
     $("details").replaceChildren(...extraFields.flatMap(([field,label]) => [el("dt",label),el("dd",display(record,field))]),
-      el("dt","Рух здобувача"),movement);
+      el("dt","Зміни статусу"),movement);
     if (isLeave && record[leaveFields[1]] && !history.some(entry => entry.reason === record[leaveFields[1]])) {
       $("details").append(el("dt","Підстава академвідпустки"),el("dd",display(record,leaveFields[1])));
     }
@@ -771,7 +790,32 @@ function setCards(next,reset = false) {
   $("export").disabled = $("backup").disabled = !cards.length;
   renderMetrics(); renderRegistry(); renderCalendar();
 }
-function saveCards(next) {
+async function saveCards(next,transfer = false) {
+  if (sync.uid) {
+    if (!sync.ready || sync.revision === null || sync.busy) throw Error("Дочекайтеся підключення або завершення синхронізації.");
+    if (!transfer && sync.revision === 0 && localCards().length) {
+      throw Error("Спочатку перенесіть локальний реєстр у спільне сховище.");
+    }
+    const uid = sync.uid;
+    sync.busy = true;
+    updateSyncControls("Зберігаємо зміни…");
+    try {
+      const revision = await sync.api.save(next,sync.revision);
+      if (sync.uid !== uid) throw Error("Обліковий запис змінився.");
+      if (revision >= sync.revision) {
+        sync.revision = revision;
+        setCards(next);
+      }
+      updateSyncControls("Реєстр синхронізовано.");
+      return true;
+    } catch (error) {
+      updateSyncControls(sync.api.errorText(error));
+      throw error;
+    } finally {
+      sync.busy = false;
+      updateSyncControls();
+    }
+  }
   setCards(next);
   try {
     localStorage.setItem(storageKey,JSON.stringify(cards));
@@ -780,11 +824,84 @@ function saveCards(next) {
     return false;
   }
 }
-function mergeCards(incoming,preserveManual) {
+function localCards() {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    return saved ? decodeBackup(JSON.parse(saved)) : [];
+  } catch { return []; }
+}
+function updateSyncControls(message) {
+  if (message !== undefined) $("syncStatus").textContent = message;
+  $("syncLogin").hidden = Boolean(sync.uid);
+  $("syncLogout").hidden = !sync.uid;
+  $("syncLogout").disabled = sync.busy;
+  $("syncTransfer").hidden = !sync.uid || sync.revision !== 0 || !localCards().length;
+  $("syncTransfer").disabled = sync.busy || !sync.ready;
+}
+async function setupSync() {
+  if (location.protocol !== "https:") return;
+  try {
+    const config = await import("./sync-config.js");
+    if (!config.firebaseConfig) return;
+    const api = sync.api = await import("./sync.js");
+    $("syncTools").hidden = false;
+    updateSyncControls("Локальний режим. Увійдіть для синхронізації.");
+    $("syncLogin").onclick = async () => {
+      $("syncLogin").disabled = true;
+      try { await api.login(); } catch (error) { updateSyncControls(api.errorText(error)); }
+      finally { $("syncLogin").disabled = false; }
+    };
+    $("syncLogout").onclick = async () => {
+      try { await api.logout(); } catch (error) { updateSyncControls(api.errorText(error)); }
+    };
+    $("syncTransfer").onclick = async () => {
+      if (sync.revision !== 0) return;
+      try { await saveCards(localCards(),true); } catch (error) { updateSyncControls(api.errorText(error)); }
+    };
+    api.observe(user => {
+      sync.unsubscribe?.();
+      sync.unsubscribe = null;
+      sync.uid = api.isOwner(user) ? user.uid : null;
+      sync.revision = null;
+      sync.ready = false;
+      if (!sync.uid) {
+        setCards(localCards());
+        updateSyncControls(user ? "Доступ до спільного реєстру дозволено лише власнику." : "Локальний режим. Увійдіть для синхронізації.");
+        return;
+      }
+      const uid = sync.uid;
+      updateSyncControls("Підключаємо спільний реєстр…");
+      sync.unsubscribe = api.subscribe(({cards:remote,revision}) => {
+        if (sync.uid !== uid || (sync.revision !== null && revision < sync.revision)) return;
+        const needsTransfer = revision === 0 && localCards().length;
+        sync.revision = revision;
+        sync.ready = true;
+        if (!needsTransfer) setCards(decodeBackup(remote));
+        updateSyncControls(needsTransfer ? "Спільний реєстр порожній. Перенесіть локальну копію один раз." : "Реєстр синхронізовано.");
+      },error => {
+        if (sync.uid !== uid) return;
+        sync.ready = false;
+        updateSyncControls(api.errorText(error));
+      });
+    });
+  } catch {
+    $("syncTools").hidden = false;
+    $("syncLogin").disabled = true;
+    updateSyncControls("Синхронізація недоступна. Локальний реєстр можна використовувати.");
+  }
+}
+function mergeCards(incoming,preserveManual,protectHistory = false) {
   const merged = new Map(cards.map(card => [card["ID картки"],card]));
   for (const card of incoming) {
     const key = card["ID картки"], old = merged.get(key);
     if (old && old["ID ФО"] !== card["ID ФО"]) throw new Error("Ідентифікатор картки вже належить іншій особі.");
+    if (protectHistory && old?.manualStatus) {
+      const before = old.statusHistory ?? [], after = card.statusHistory ?? [];
+      if (before.some((entry,index) => JSON.stringify(entry) !== JSON.stringify(after[index]))
+          || (after.length === before.length && old["Контингент"] !== card["Контингент"])) {
+        throw Error("Копія містить іншу або застарілу історію статусу. Спільний реєстр залишено без змін.");
+      }
+    }
     if (preserveManual && old?.manualStatus) {
       const history = old.statusHistory ?? [];
       const updated = {...card,"Контингент":old["Контингент"],manualStatus:true};
@@ -865,6 +982,7 @@ function setup() {
     $("registryTab").focus();
   };
   $("closeCard").onclick = () => $("card").close();
+  $("card").addEventListener("close",() => { $("details").parentElement.open = false; });
   $("cancelStatus").onclick = () => $("statusDialog").close();
   for (const name of ["registry","calendar"]) {
     $(name+"Tab").onclick = () => {
@@ -885,10 +1003,10 @@ function setup() {
     try {
       const backup = JSON.parse(await file.text());
       if (backup?.format !== storageKey) throw new Error();
-      const saved = saveCards(mergeCards(decodeBackup(backup.cards),false));
+      const saved = await saveCards(mergeCards(decodeBackup(backup.cards),false,Boolean(sync.uid)));
       showNotice(saved ? "" : "Копію відкрито на час роботи у вкладці.",!saved);
-    } catch {
-      showNotice("Не вдалося відкрити копію реєстру. Виберіть JSON, створений у цьому застосунку.",true);
+    } catch (error) {
+      showNotice(sync.uid ? sync.api.errorText(error) : "Не вдалося відкрити копію реєстру. Виберіть JSON, створений у цьому застосунку.",true);
     } finally { $("backupFile").value = ""; }
   };
   $("files").onchange = async () => {
@@ -898,7 +1016,7 @@ function setup() {
     $("notice").className = "";
     $("notice").textContent = "Читаємо вибрані файли…";
     try {
-      const saved = saveCards(mergeCards(await readFiles(files),true));
+      const saved = await saveCards(mergeCards(await readFiles(files),true));
       showNotice(saved ? `Імпортовано файлів · ${files.length}. Реєстр збережено в цьому браузері.`
         : "Імпорт завершено. Браузер не зберіг реєстр, збережіть копію перед закриттям.",!saved);
     } catch (error) {
@@ -921,6 +1039,7 @@ function setup() {
   }
 }
 setup();
+setupSync();
 if (location.protocol === "https:" || location.hostname === "localhost") {
   $("installation").hidden = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   let installPrompt;
