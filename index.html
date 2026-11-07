@@ -34,7 +34,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .metrics .metric:hover,.metrics .metric[aria-pressed=true]{background:#eaf3ff;color:inherit;border-color:#8db3e6}
 .metricSelection{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .profileHead{display:grid;grid-template-columns:minmax(0,1fr) auto}
-.profileActions{display:grid;gap:6px;justify-items:end}
+.profileActions{display:grid;gap:6px;justify-items:stretch}
 .cardClose{float:none;margin:0}
 .cardList summary{display:list-item;cursor:pointer;background:#e9f1fc;color:#15447f;border-radius:8px;padding:10px;font-weight:650}
 .mobileSort{display:block;max-width:320px;margin-bottom:8px;font-size:13px}
@@ -111,10 +111,14 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 @media(max-width:760px){#filterDialog{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:85dvh;border-radius:16px 16px 0 0}}
 .statusTools{margin:12px 0}.statusForm{display:grid;gap:10px}.statusForm label{font-size:13px;font-weight:650}.statusForm input,.statusForm select{font-size:16px}.statusFormActions{display:flex;gap:8px;justify-content:flex-end;margin-top:5px}
 .statusHistory{margin:12px 0}.statusHistory ol{margin:8px 0;padding-inline-start:22px}.statusHistory li{margin-bottom:8px;overflow-wrap:anywhere}
-.profileCardNumber{display:grid;gap:2px;min-width:0;padding:6px 8px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.profileCardNumber{display:grid;gap:2px;min-width:0;padding:6px 8px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:center}
 .profileCardNumber strong{font-size:13px}
 #person .nameLine{display:block}
-@media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{max-width:92px;padding-inline:6px}}
+#changeStatus,.profileMore>summary{width:min(100%,180px);min-height:41px}
+.profileMore>summary{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 13px;border-radius:8px;background:#dceaff;color:#15447f;font-weight:650;cursor:pointer}
+.profileMore>summary::after{content:"+"}.profileMore[open]>summary::after{content:"−"}
+.profileMore>summary:hover{background:#ccdef7}
+@media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{padding-inline:6px}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -148,7 +152,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section class="deadlineBox" id="profileDeadline"></section>
 <div class="statusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button></div>
 <details class="statusHistory" id="statusHistory" hidden><summary>Історія статусів</summary><ol id="statusHistoryEntries"></ol></details>
-<details><summary>Інші відомості</summary><dl id="details"></dl></details>
+<details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
 <h2 id="statusTitle">Змінити статус</h2>
@@ -697,7 +701,8 @@ function openCard(selected) {
     const factFields = [["Початок навчання","Початок навчання"],["Завершення навчання","Завершення навчання"],
       ["Спеціальність","Спеціальність"],["Освітня програма","Освітньо-наукова програма"]];
     $("profileFacts").replaceChildren(...factFields.map(([field,label]) => {
-      const fact = el("div"); fact.append(el("dt",label),el("dd",display(record,field))); return fact;
+      const value = field === "Освітня програма" ? record[field] || "Потребує уточнення" : display(record,field);
+      const fact = el("div"); fact.append(el("dt",label),el("dd",value)); return fact;
     }));
     const deadline = $("profileDeadline");
     deadline.hidden = currentStatus === COMPLETED || currentStatus === DISMISSED;
@@ -728,7 +733,7 @@ function openCard(selected) {
       if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
       return item;
     }));
-    const extraFields = [["Дата народження","Дата народження"],["Структурний підрозділ","Структурний підрозділ"],
+    const extraFields = [["Дата народження","Дата народження"],["ID ОП","ID ОНП"],
       ["Статус навчання","Статус у ЄДЕБО"]];
     if (isLeave && record[leaveFields[1]]) extraFields.push([leaveFields[1],"Підстава академвідпустки"]);
     $("details").replaceChildren(...extraFields.flatMap(([field,label]) => [el("dt",label),el("dd",display(record,field))]));
