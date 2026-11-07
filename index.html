@@ -69,9 +69,11 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .filters select,.mobileSort select{font-size:12px;padding:6px 7px}
 #registry tbody .groupRow{grid-column:1/-1;display:block;margin-top:5px;border:0;padding:6px 9px;background:#edf4fd;color:#174d91}
 #registry tbody .groupRow td{display:block;font-weight:700}
-#registry tbody .groupRow.faculty{background:#f2f6fc;margin-top:0}
-#registry tbody .groupRow.program{background:transparent;padding-block:3px;margin-top:0}
-#registry tbody .groupRow.program td{font-weight:600;color:#465b75}
+#registry tbody .groupRow.course{padding:0}
+.courseToggle{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:42px;padding:8px 11px;background:transparent;text-align:left}
+.courseToggle::after{content:"+";font-size:18px;line-height:1}
+.courseToggle[aria-expanded=true]::after{content:"−"}
+.courseToggle:hover{background:#e0edff}
 #registry td.registryDeadline{grid-column:1/-1;grid-row:6;color:#405571;font-weight:650}
 #courses{display:grid;gap:6px}
 .courseTile{display:grid;grid-template-columns:57px minmax(0,1fr) 40px;align-items:center;gap:8px;padding:6px 8px;border:1px solid #dce6f1;border-radius:10px;background:#f6f9fe;color:#405571;font-size:13px}
@@ -327,6 +329,7 @@ function icon(name,className = "") {
 }
 let cards = [], selectedMetric = null;
 let metricGroups = [];
+const expandedCourses = new Map([[0,new Set()],[2,new Set()]]);
 const filters = new Map();
 let draftFilters = new Map();
 const searchableFilters = new Set(["Структурний підрозділ","Спеціальність","Освітня програма"]);
@@ -485,24 +488,38 @@ function renderRegistry() {
   } else matches.sort(compareNames);
   $("emptyRegistry").hidden = Boolean(matches.length);
   $("emptyRegistry").textContent = cards.length ? "За цими умовами карток немає." : "Імпортуйте Excel або відкрийте копію реєстру.";
-  let previousGroup = [];
+  const courseRows = new Map();
+  const expanded = expandedCourses.get(selectedMetric);
   $("registryBody").replaceChildren(...matches.flatMap(record => {
     const headings = [];
-    if (group?.grouped) {
-      const labels = groupFields.map(field => display(record,field));
-      const changed = labels.findIndex((label,index) => label !== previousGroup[index]);
-      const headingLevels = selectedMetric === 0 ? 1 : labels.length;
-      if (changed >= 0) for (let index = changed; index < headingLevels; index++) {
-        const heading = el("tr");
-        heading.className = "groupRow "+["course","faculty","program"][index];
-        const title = el("td",index === 0 ? (labels[index] === "—" ? "Курс потребує уточнення" : `${labels[index]} курс`) : labels[index]);
-        title.colSpan = columns.length;
-        heading.append(title);
-        headings.push(heading);
-      }
-      previousGroup = labels;
+    const course = display(record,"Курс");
+    let section = courseRows.get(course);
+    if (expanded && !section) {
+      const heading = el("tr"), cell = el("td");
+      const label = course === "—" ? "Курс потребує уточнення" : `${course} курс`;
+      const button = el("button",label);
+      section = {rows:[],open:expanded.has(course) || Boolean(query) || filters.has("Курс")};
+      courseRows.set(course,section);
+      heading.className = "groupRow course";
+      cell.colSpan = columns.length;
+      button.type = "button";
+      button.className = "courseToggle";
+      button.setAttribute("aria-expanded",String(section.open));
+      button.onclick = () => {
+        section.open = !section.open;
+        if (section.open) expanded.add(course); else expanded.delete(course);
+        button.setAttribute("aria-expanded",String(section.open));
+        for (const item of section.rows) item.hidden = !section.open;
+      };
+      cell.append(button);
+      heading.append(cell);
+      headings.push(heading);
     }
     const row = el("tr");
+    if (section) {
+      row.hidden = !section.open;
+      section.rows.push(row);
+    }
     for (const field of columns) {
       const cell = el("td");
       if (field === "Здобувач") {
