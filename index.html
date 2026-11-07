@@ -85,6 +85,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .courseTile progress::-moz-progress-bar,.countdown progress::-moz-progress-bar{background:currentColor}
 .countdown{display:grid;gap:3px;margin-top:6px;font-size:12px;color:#405571}.countdown progress{height:7px}
 .countdown[data-band="60"] progress{color:#398489}.countdown[data-band="30"] progress{color:#927124}.countdown[data-band="14"] progress{color:#a85827}.countdown[data-band="7"] progress,.countdown[data-band="0"] progress{color:#a32930}
+.countdown[data-band="6m"] progress{color:#a85827}
 .countdownTicks{position:relative;height:1.4em;color:#526985;font-size:11px}
 .countdownTicks span{position:absolute;transform:translateX(-50%)}
 .countdownTicks span:first-child{transform:none}.countdownTicks span:last-child{transform:translateX(-100%)}
@@ -162,6 +163,16 @@ const MS_DAY = 86400000;
 const LEAVE_WINDOWS = [7,14,30,60,90];
 const LEAVE_END_EVENT = "Закінчення академвідпустки";
 const daysUntil = (due,asOf) => (Date.parse(due)-Date.parse(asOf))/MS_DAY;
+function studyWindows(due) {
+  const date = new Date(due);
+  return [9,6].map(months => {
+    const first = new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()-months,1));
+    const lastDay = new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+    first.setUTCDate(Math.min(date.getUTCDate(),lastDay));
+    const start = first.toISOString().slice(0,10);
+    return {months,start,days:daysUntil(due,start)};
+  });
+}
 const decoder = new TextDecoder();
 
 function openZip(buffer) {
@@ -279,11 +290,13 @@ function deadlines(cards,asOf) {
     for (const [name,due] of dates) {
       const days = daysUntil(due,asOf);
       const windows = name === LEAVE_END_EVENT ? LEAVE_WINDOWS : [7,14,30,90];
+      const study = due && name !== LEAVE_END_EVENT && card["Контингент"] === ACTIVE ? studyWindows(due) : null;
       const review = !due || (name === "Завершення навчання" && leave && due < leave);
-      if (!review && days > 90) continue;
+      if (!review && days > (study?.[0].days ?? 90)) continue;
       const status = !due ? "Немає дати" : review ? "Звірити з наказом" : days < 0 ? "Прострочено"
-        : days === 0 ? "Сьогодні" : `До ${windows.find(limit => days <= limit)} днів`;
-      events.push({card,name,due,days,status,review:Boolean(review),urgent:!review && days<=0});
+        : days === 0 ? "Сьогодні" : days <= 90 ? `До ${windows.find(limit => days <= limit)} днів`
+        : `До ${asOf >= study[1].start ? 6 : 9} місяців`;
+      events.push({card,name,due,days,study,status,review:Boolean(review),urgent:!review && days<=0});
     }
   }
   return events.sort((a,b) => a.review-b.review || (a.due ?? "9999").localeCompare(b.due ?? "9999"));
@@ -304,23 +317,27 @@ function el(tag,text) {
   if (text != null) node.textContent = text;
   return node;
 }
-function leaveCountdown(days) {
+function countdown(days,study = null) {
   const box = el("div"), bar = el("progress"), ticks = el("div");
   box.className = "countdown";
-  box.dataset.band = days <= 0 ? 0 : LEAVE_WINDOWS.find(limit => days <= limit) ?? 90;
+  const max = study?.[0].days ?? 90;
+  box.dataset.band = days <= 0 ? 0 : study ? (days <= study[1].days ? "6m" : "9m")
+    : LEAVE_WINDOWS.find(limit => days <= limit) ?? 90;
   const amount = Math.abs(days), last = amount % 10, teens = amount % 100 >= 11 && amount % 100 <= 14;
   const unit = !teens && last === 1 ? "день" : !teens && last >= 2 && last <= 4 ? "дні" : "днів";
   const label = days < 0 ? `Прострочено на ${amount} ${unit}`
-    : days === 0 ? "Відпустка закінчується сьогодні"
+    : days === 0 ? (study ? "Навчання завершується сьогодні" : "Відпустка закінчується сьогодні")
     : `${unit === "день" ? "Залишився" : "Залишилося"} ${amount} ${unit}`;
-  bar.max = 90;
-  bar.value = Math.max(0,Math.min(90,90-days));
+  bar.max = max;
+  bar.value = Math.max(0,Math.min(max,max-days));
   bar.setAttribute("aria-label",label);
   ticks.className = "countdownTicks";
-  ticks.append(...[90,60,30,14,0].map(day => {
-    const tick = el("span",day ? String(day) : "");
+  const milestones = study ? [...study.map(({days,months}) => [days,`${months} міс.`]),[0,""]]
+    : [90,60,30,14,0].map(day => [day,day ? String(day) : ""]);
+  ticks.append(...milestones.map(([day,text]) => {
+    const tick = el("span",text);
     if (!day) tick.append(icon("bell"));
-    tick.style.left = `${(90-day)/90*100}%`;
+    tick.style.left = `${(max-day)/max*100}%`;
     return tick;
   }));
   ticks.setAttribute("aria-hidden","true");
@@ -562,7 +579,8 @@ function renderCalendar() {
     const row = el("tr"), person = el("td"), status = el("td"), pill = el("span",event.status);
     person.append(nameButton(event.card));
     pill.className = "pill "+(event.urgent ? "urgent" : event.review ? "review" : "");
-    status.append(event.name === LEAVE_END_EVENT && Number.isFinite(event.days) ? leaveCountdown(event.days) : pill);
+    status.append((event.name === LEAVE_END_EVENT || event.study) && Number.isFinite(event.days)
+      ? countdown(event.days,event.study) : pill);
     row.append(person,el("td",event.name),el("td",formatDate(event.due)),status);
     return row;
   }));
@@ -592,7 +610,9 @@ function openCard(selected) {
       ? `${isLeave ? "Закінчення відпустки" : "Завершення навчання"} · ${formatDate(due)}`
       : "Дата потребує уточнення."));
     const remaining = daysUntil(due,$("asOf").value);
-    if (isLeave && Number.isFinite(remaining)) deadline.append(leaveCountdown(remaining));
+    if (Number.isFinite(remaining) && (isLeave || currentStatus === ACTIVE)) {
+      deadline.append(countdown(remaining,isLeave ? null : studyWindows(due)));
+    }
     if (isLeave && due && record["Завершення навчання"] && record["Завершення навчання"] < due) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
