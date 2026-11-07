@@ -88,6 +88,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .countdownTicks{position:relative;height:1.4em;color:#526985;font-size:11px}
 .countdownTicks span{position:absolute;transform:translateX(-50%)}
 .countdownTicks span:first-child{transform:none}.countdownTicks span:last-child{transform:translateX(-100%)}
+.countdownTicks svg{display:block;width:13px;height:13px;color:#a32930}
 .registryControls{display:flex;align-items:end;gap:8px}.registryControls label{flex:1;min-width:0}.activeFilters{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
 #filterDialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(440px,100%);max-width:none;height:100%;max-height:100%;border-radius:16px 0 0 16px}
 .filterHead,.filterActions{display:flex;align-items:center;justify-content:space-between;gap:8px;background:white;padding:8px 0}
@@ -96,11 +97,14 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .filterChoices{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.filterChoices button,.activeFilters button{font-size:12px;padding:7px 9px}
 .filterGroup input{font-size:14px}
 .filterChoices.longChoices{display:grid;grid-template-columns:minmax(0,1fr)}
-.filterChoices.longChoices button{text-align:left;white-space:normal;overflow-wrap:anywhere}
+#filterDialog .longChoices>button{display:block;width:100%;justify-self:stretch;text-align:left;white-space:normal;overflow-wrap:anywhere}
+#filterDialog .filterGroup>summary{text-align:left}
 .filterMobileLabel{display:none}
 @media(max-width:760px){
   .registryControls{display:grid;grid-template-columns:minmax(0,1fr)}
-  #openFilters{text-align:left;min-height:42px}
+  #openFilters{text-align:left;min-height:42px;background:white;border:1px solid #a9c5e9;padding-inline:12px}
+  #registryList{margin-top:12px;padding-top:12px;border-top:1px solid #dce6f1}
+  #registryList>summary{padding-inline:12px}
   .filterMobileLabel{display:inline}.filterDesktopLabel{display:none}
 }
 @media(max-width:760px){#filterDialog{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:85dvh;border-radius:16px 16px 0 0}}
@@ -125,7 +129,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 </div>
 <div id="calendar" hidden>
 <label>Станом на <input id="asOf" type="date" style="max-width:180px"></label>
-<details class="cardList" id="calendarList" open><summary>Картки строків</summary><div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="eventBody"></tbody></table></div></details>
+<div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="eventBody"></tbody></table></div>
 </div>
 </section>
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
@@ -313,8 +317,9 @@ function leaveCountdown(days) {
   bar.value = Math.max(0,Math.min(90,90-days));
   bar.setAttribute("aria-label",label);
   ticks.className = "countdownTicks";
-  ticks.append(...[90,60,30,14,7,0].map(day => {
-    const tick = el("span",String(day));
+  ticks.append(...[90,60,30,14,0].map(day => {
+    const tick = el("span",day ? String(day) : "");
+    if (!day) tick.append(icon("bell"));
     tick.style.left = `${(90-day)/90*100}%`;
     return tick;
   }));
@@ -675,7 +680,7 @@ function decodeBackup(data) {
 function setup() {
   const mobile = matchMedia("(max-width:760px)");
   const setFilterVisibility = () => {
-    for (const id of ["registryList","calendarList"]) $(id).open = !mobile.matches;
+    $("registryList").open = !mobile.matches;
   };
   setFilterVisibility();
   mobile.addEventListener("change",setFilterVisibility);
