@@ -48,6 +48,9 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   .cardList summary{display:list-item;cursor:pointer;background:#e9f1fc;color:#15447f;border-radius:8px;padding:10px;font-weight:650}
   .backupActions button,.siteFooter .footerBlock{font-size:13px}
 }
+.metrics .metric{background:white;text-align:left;color:inherit;font-weight:400}
+.metrics .metric:hover,.metrics .metric[aria-pressed=true]{background:#eaf3ff;color:inherit;border-color:#8db3e6}
+.metricSelection{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 </style>
 <main>
 <header><div><h1>Аспіранти НУБіП України</h1></div>
@@ -62,6 +65,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <nav class="toolbar mainNav" aria-label="Розділи"><button id="registryTab" aria-pressed="true">Реєстр</button><button id="calendarTab" aria-pressed="false">Календар строків</button><button id="export" title="Експорт реєстру у CSV для Excel">Експорт</button></nav>
 <div class="toolbar" id="installation" hidden><button id="install">Встановити застосунок</button><span id="installHelp" hidden></span></div>
 <div id="registry">
+<div class="metricSelection" id="metricSelection" hidden><strong id="metricSelectionLabel"></strong><button id="clearMetric">Показати всі картки</button></div>
 <label class="registrySearch">Пошук за ПІБ<input id="search" type="search" placeholder="Введіть ім’я або прізвище"></label>
 <details class="registryTools" id="registryTools" open><summary>Фільтри й сортування</summary>
 <label class="mobileSort">Сортування<select id="mobileSort"></select></label><div class="filters" id="filters"></div></details>
@@ -250,26 +254,42 @@ function icon(name,className = "") {
     "stroke-width":1.7,"stroke-linecap":"round","stroke-linejoin":"round","aria-hidden":"true",class:className})) svg.setAttribute(key,value);
   path.setAttribute("d",iconPaths[name]); svg.append(path); return svg;
 }
-let cards = [], sortField = "Здобувач", descending = false;
+let cards = [], sortField = "Здобувач", descending = false, selectedMetric = null;
+let metricGroups = [];
 const filters = new Map();
 
 function renderMetrics() {
   const active = cards.filter(c => c["Контингент"] === ACTIVE);
   const leave = cards.filter(c => c["Контингент"] === LEAVE);
   const year = Number($("asOf").value.slice(0,4) || new Date().getFullYear())+1;
-  const needsAttention = new Set(deadlines(cards,$("asOf").value).map(event => event.card["ID картки"]));
+  const needsAttention = new Set($("asOf").value ? deadlines(cards,$("asOf").value).map(event => event.card["ID картки"]) : []);
   const ending = active.filter(c => c["Завершення навчання"]?.startsWith(String(year)));
-  const values = [[active.length,"Навчаються","people"],[leave.length,"Академічні відпустки","calendar"],
-    [ending.length,`Завершують у ${year} році`,"cap"],[needsAttention.size,"Потребують уваги","bell"]];
-  $("metrics").replaceChildren(...values.map(([number,label,symbol]) => {
-    const box = el("div"), caption = el("span");
+  const values = [[active,"Навчаються","people"],[leave,"Академічні відпустки","calendar"],
+    [ending,`Завершують у ${year} році`,"cap"],
+    [cards.filter(c => needsAttention.has(c["ID картки"])),"Потребують уваги","bell"]];
+  metricGroups = values.map(([records,label]) => ({label,ids:new Set(records.map(card => card["ID картки"]))}));
+  $("metrics").replaceChildren(...values.map(([records,label,symbol],index) => {
+    const box = el("button"), caption = el("span");
+    box.type = "button";
     box.className = "metric";
+    box.setAttribute("aria-controls","registry");
+    box.setAttribute("aria-pressed",String(index === selectedMetric));
+    box.onclick = () => {
+      selectedMetric = index;
+      $("search").value = "";
+      for (const select of filters.values()) select.value = "";
+      $("registryTab").click();
+      $("registryList").open = true;
+      renderRegistry();
+      $("registryTab").focus({preventScroll:true});
+      $("registryTab").scrollIntoView({block:"start"});
+    };
     if (label.startsWith("Завершують у ")) {
       const yearLabel = el("span",label.slice("Завершують ".length));
       yearLabel.className = "metricYear";
       caption.append("Завершують ",yearLabel);
     } else caption.textContent = label;
-    box.append(icon(symbol,"metricIcon"),el("strong",count(number)),caption);
+    box.append(icon(symbol,"metricIcon"),el("strong",count(records.length)),caption);
     return box;
   }));
   const courses = new Map([1,2,3,4].map(course => [course,0]));
@@ -291,7 +311,12 @@ function nameButton(record) {
 }
 function renderRegistry() {
   const query = $("search").value.trim().toLocaleLowerCase("uk");
-  const matches = cards.filter(card => String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
+  const group = selectedMetric === null ? null : metricGroups[selectedMetric];
+  $("metricSelection").hidden = !group;
+  $("metricSelectionLabel").textContent = group?.label ?? "";
+  [...$("metrics").children].forEach((button,index) => button.setAttribute("aria-pressed",String(index === selectedMetric)));
+  const matches = cards.filter(card => (!group || group.ids.has(card["ID картки"]))
+    && String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
     && [...filters].every(([field,select]) => !select.value || select.value === String(display(card,field))));
   matches.sort((a,b) => (descending ? -1 : 1)*collator.compare(display(a,sortField),display(b,sortField)));
   $("emptyRegistry").hidden = Boolean(matches.length);
@@ -471,7 +496,14 @@ function setup() {
   };
   const now = new Date();
   $("asOf").value = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  $("asOf").onchange = () => { renderCalendar(); renderMetrics(); };
+  $("asOf").onchange = () => { renderCalendar(); renderMetrics(); renderRegistry(); };
+  $("clearMetric").onclick = () => {
+    selectedMetric = null;
+    $("search").value = "";
+    for (const select of filters.values()) select.value = "";
+    renderRegistry();
+    $("registryTab").focus();
+  };
   $("avatar").append(icon("person"));
   $("closeCard").onclick = () => $("card").close();
   for (const name of ["registry","calendar"]) {

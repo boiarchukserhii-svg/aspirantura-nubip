@@ -1,4 +1,4 @@
-const CACHE = "aspirantura-nubip-app-v6";
+const CACHE = "aspirantura-nubip-app-v7";
 const HOME = new URL("./",self.location).href;
 self.addEventListener("install",event => {
   event.waitUntil((async () => {
