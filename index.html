@@ -94,6 +94,14 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .filterGroup{padding:9px 0;border-bottom:1px solid #dce6f1}.filterGroup summary{cursor:pointer;font-size:13px;font-weight:650}
 .filterChoices{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.filterChoices button,.activeFilters button{font-size:12px;padding:7px 9px}
 .filterGroup input{font-size:14px}
+.filterChoices.longChoices{display:grid;grid-template-columns:minmax(0,1fr)}
+.filterChoices.longChoices button{text-align:left;white-space:normal;overflow-wrap:anywhere}
+.filterMobileLabel{display:none}
+@media(max-width:760px){
+  .registryControls{display:grid;grid-template-columns:minmax(0,1fr)}
+  #openFilters{text-align:left;min-height:42px}
+  .filterMobileLabel{display:inline}.filterDesktopLabel{display:none}
+}
 @media(max-width:760px){#filterDialog{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:85dvh;border-radius:16px 16px 0 0}}
 </style>
 <main>
@@ -110,7 +118,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="toolbar" id="installation" hidden><button id="install">Встановити застосунок</button><span id="installHelp" hidden></span></div>
 <div id="registry">
 <div class="metricSelection" id="metricSelection" hidden><strong id="metricSelectionLabel"></strong><button id="clearMetric">Показати всі картки</button></div>
-<div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="search" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openFilters" aria-haspopup="dialog">Фільтри</button></div>
+<div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="search" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="activeFilterCount"></span></button></div>
 <div class="activeFilters" id="activeFilters" aria-label="Активні фільтри" hidden></div>
 <details class="cardList" id="registryList" open><summary>Картки здобувачів</summary><p id="emptyRegistry" hidden></p><div class="scroll"><table><thead id="registryHead"></thead><tbody id="registryBody"></tbody></table></div></details>
 </div>
@@ -359,7 +367,8 @@ function renderFilterPanel() {
     group.open = expanded.has(field) || (!container.children.length && !expanded.size && index === 0);
     const current = draftFilters.get(field);
     group.append(el("summary",filterLabel(field)+(current ? " · "+filterValue(field,current) : "")));
-    choices.className = "filterChoices";
+    choices.className = searchableFilters.has(field) && field !== "Спеціальність"
+      ? "filterChoices longChoices" : "filterChoices";
     function renderChoices(query = "") {
       const options = filterOptions(field,draftFilters).filter(value => value.toLocaleLowerCase("uk").includes(query));
       choices.replaceChildren(...["",...options].map(value => {
@@ -390,7 +399,7 @@ function renderFilterPanel() {
   }));
 }
 function renderActiveFilters() {
-  $("openFilters").textContent = filters.size ? `Фільтри · ${filters.size}` : "Фільтри";
+  $("activeFilterCount").textContent = filters.size ? ` · ${filters.size}` : "";
   $("activeFilters").hidden = !filters.size;
   $("activeFilters").replaceChildren(...[...filters].map(([field,value]) => {
     const button = el("button",filterValue(field,value)+" ×");
