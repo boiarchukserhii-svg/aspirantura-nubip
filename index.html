@@ -373,8 +373,7 @@ function renderFilterPanel() {
     group.open = expanded.has(field) || (!container.children.length && !expanded.size && index === 0);
     const current = draftFilters.get(field);
     group.append(el("summary",filterLabel(field)+(current ? " · "+filterValue(field,current) : "")));
-    choices.className = searchableFilters.has(field) && field !== "Спеціальність"
-      ? "filterChoices longChoices" : "filterChoices";
+    choices.className = searchableFilters.has(field) ? "filterChoices longChoices" : "filterChoices";
     function renderChoices(query = "") {
       const options = filterOptions(field,draftFilters).filter(value => value.toLocaleLowerCase("uk").includes(query));
       choices.replaceChildren(...["",...options].map(value => {
