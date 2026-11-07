@@ -400,7 +400,8 @@ function renderRegistry() {
     if (group?.grouped) {
       const labels = groupFields.map(field => display(record,field));
       const changed = labels.findIndex((label,index) => label !== previousGroup[index]);
-      if (changed >= 0) for (let index = changed; index < labels.length; index++) {
+      const headingLevels = selectedMetric === 0 ? 1 : labels.length;
+      if (changed >= 0) for (let index = changed; index < headingLevels; index++) {
         const heading = el("tr");
         heading.className = "groupRow "+["course","faculty","program"][index];
         const title = el("td",index === 0 ? (labels[index] === "—" ? "Курс потребує уточнення" : `${labels[index]} курс`) : labels[index]);
