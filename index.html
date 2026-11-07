@@ -110,7 +110,9 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 }
 @media(max-width:760px){#filterDialog{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:85dvh;border-radius:16px 16px 0 0}}
 .statusTools{margin:12px 0}.statusForm{display:grid;gap:10px}.statusForm label{font-size:13px;font-weight:650}.statusForm input,.statusForm select{font-size:16px}.statusFormActions{display:flex;gap:8px;justify-content:flex-end;margin-top:5px}
-.statusHistory{margin:12px 0}.statusHistory ol{margin:8px 0;padding-inline-start:22px}.statusHistory li{margin-bottom:8px;overflow-wrap:anywhere}
+.statusHistory ol{margin:0;padding-inline-start:18px}.statusHistory li{margin-bottom:8px;overflow-wrap:anywhere}
+.statusActionGroup{min-width:0;margin:0;padding:0;border:0}.statusActionGroup legend{font-size:13px;font-weight:650}
+.statusActionGroup .filterChoices{display:grid;grid-template-columns:minmax(0,1fr)}.statusActionGroup .filterChoices button{text-align:left}
 .profileCardNumber{display:grid;gap:2px;min-width:0;padding:6px 8px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:center}
 .profileCardNumber strong{font-size:13px}
 #person .nameLine{display:block}
@@ -151,20 +153,19 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
 <section class="deadlineBox" id="profileDeadline"></section>
 <div class="statusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button></div>
-<details class="statusHistory" id="statusHistory" hidden><summary>Історія статусів</summary><ol id="statusHistoryEntries"></ol></details>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
 <h2 id="statusTitle">Змінити статус</h2>
 <form id="statusForm" class="statusForm">
-<label>Дія<select id="statusAction" required></select></label>
+<fieldset class="statusActionGroup"><legend>Виберіть дію</legend><div class="filterChoices" id="statusActions"></div></fieldset>
 <label>Дата набрання чинності<input id="statusEffective" type="date" required></label>
 <label id="leaveEndLabel" hidden>Академвідпустка до<input id="statusLeaveEnd" type="date"></label>
 <label id="leaveReasonLabel" hidden>Підстава академвідпустки<input id="statusLeaveReason" maxlength="240"></label>
 <label id="studyEndLabel" hidden>Уточнена дата завершення навчання<input id="statusStudyEnd" type="date"></label>
 <label>Номер наказу<input id="statusOrderNumber" maxlength="80" required></label>
 <label>Дата наказу<input id="statusOrderDate" type="date" required></label>
-<div class="statusFormActions"><button type="button" id="cancelStatus">Скасувати</button><button type="submit" class="primary">Зберегти зміну</button></div>
+<div class="statusFormActions"><button type="button" id="cancelStatus">Скасувати</button><button type="submit" id="saveStatus" class="primary">Зберегти зміну</button></div>
 </form>
 </dialog>
 <dialog id="filterDialog" aria-labelledby="filterTitle">
@@ -619,21 +620,29 @@ function renderCalendar() {
   }));
 }
 function editStatus(record) {
-  const dialog = $("statusDialog"), form = $("statusForm"), actionInput = $("statusAction");
+  const dialog = $("statusDialog"), form = $("statusForm");
   const current = record["Контингент"];
   const options = statusActions.filter(action => action.id === "extend" ? current === LEAVE : action.target !== current);
   form.reset();
-  const choose = el("option","Виберіть дію"); choose.value = ""; choose.disabled = true;
-  actionInput.replaceChildren(choose,...options.map(action => {
-    const option = el("option",action.label); option.value = action.id; return option;
+  let selectedAction = null;
+  $("statusActions").replaceChildren(...options.map(action => {
+    const button = el("button",action.label);
+    button.type = "button";
+    button.setAttribute("aria-pressed","false");
+    button.onclick = () => {
+      selectedAction = action;
+      for (const choice of $("statusActions").children) choice.setAttribute("aria-pressed",String(choice === button));
+      validate();
+    };
+    return button;
   }));
-  actionInput.value = "";
   const now = new Date();
   const today = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("statusEffective").value = today;
   $("statusEffective").max = today;
   function validate() {
-    const action = options.find(item => item.id === actionInput.value);
+    const action = selectedAction;
+    $("saveStatus").disabled = !action;
     const leave = action?.target === LEAVE, extend = action?.id === "extend";
     $("leaveEndLabel").hidden = !leave;
     $("statusLeaveEnd").required = leave;
@@ -722,9 +731,10 @@ function openCard(selected) {
     }
     $("changeStatus").onclick = () => editStatus(record);
     const history = record.statusHistory ?? [];
-    $("statusHistory").hidden = !history.length;
-    $("statusHistory").open = false;
-    $("statusHistoryEntries").replaceChildren(...[...history].reverse().map(entry => {
+    const movement = el("dd");
+    movement.className = "statusHistory";
+    const entries = el("ol");
+    entries.append(...[...history].reverse().map(entry => {
       const item = el("li");
       item.append(el("strong",`${formatDate(entry.date)} · ${entry.action}`),
         el("div",`Наказ № ${entry.orderNumber} від ${formatDate(entry.orderDate)}`));
@@ -733,10 +743,14 @@ function openCard(selected) {
       if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
       return item;
     }));
+    movement.append(history.length ? entries : el("span","Записів про зміну статусу ще немає."));
     const extraFields = [["Дата народження","Дата народження"],["ID ОП","ID ОНП"],
       ["Статус навчання","Статус у ЄДЕБО"]];
-    if (isLeave && record[leaveFields[1]]) extraFields.push([leaveFields[1],"Підстава академвідпустки"]);
-    $("details").replaceChildren(...extraFields.flatMap(([field,label]) => [el("dt",label),el("dd",display(record,field))]));
+    $("details").replaceChildren(...extraFields.flatMap(([field,label]) => [el("dt",label),el("dd",display(record,field))]),
+      el("dt","Рух здобувача"),movement);
+    if (isLeave && record[leaveFields[1]] && !history.some(entry => entry.reason === record[leaveFields[1]])) {
+      $("details").append(el("dt","Підстава академвідпустки"),el("dd",display(record,leaveFields[1])));
+    }
     for (const button of $("cardTabs").children) button.setAttribute("aria-pressed",button.dataset.key === String(record["ID картки"]));
   }
   $("cardTabs").replaceChildren(...(related.length > 1 ? related : []).map((record,index) => {
