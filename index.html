@@ -33,9 +33,9 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .metrics .metric{background:white;text-align:left;color:inherit;font-weight:400}
 .metrics .metric:hover,.metrics .metric[aria-pressed=true]{background:#eaf3ff;color:inherit;border-color:#8db3e6}
 .metricSelection{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px}
-.profileHead{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
-.cardClose{float:none;margin:0;align-self:start}
-@media(max-width:430px){.profileHead{grid-template-columns:auto minmax(0,1fr)}.cardClose{grid-column:1/-1;grid-row:1;justify-self:end}}
+.profileHead{display:grid;grid-template-columns:minmax(0,1fr) auto}
+.profileActions{display:grid;gap:6px;justify-items:end}
+.cardClose{float:none;margin:0}
 .cardList summary{display:list-item;cursor:pointer;background:#e9f1fc;color:#15447f;border-radius:8px;padding:10px;font-weight:650}
 .mobileSort{display:block;max-width:320px;margin-bottom:8px;font-size:13px}
 #registry table,#calendar table{display:block}
@@ -143,7 +143,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <footer class="siteFooter"><span class="footerBlock">© Сергій БОЯРЧУК, 2026</span><a class="footerBlock" href="https://nubip.edu.ua/department/viddil-aspirantury-doktorantury-ta-atestatsiyi-naukovykh-kadriv">Відділ аспірантури, докторантури та атестації наукових кадрів</a></footer>
 </main>
 <dialog id="card">
-<div class="profileHead"><div class="profileCardNumber"><span>№ картки</span><strong id="profileCardNumber"></strong></div><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div><button class="cardClose" id="closeCard">Закрити</button></div>
+<div class="profileHead"><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div><div class="profileActions"><button class="cardClose" id="closeCard">Закрити</button><div class="profileCardNumber"><span>№ картки</span><strong id="profileCardNumber"></strong></div></div></div>
 <div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
 <section class="deadlineBox" id="profileDeadline"></section>
 <div class="statusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button></div>
