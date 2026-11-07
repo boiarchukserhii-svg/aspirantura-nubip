@@ -21,24 +21,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   .panel{padding:10px}.mainNav{display:grid;grid-template-columns:1fr 1.65fr 1fr;gap:4px}
   .mainNav button{font-size:clamp(11px,3.2vw,14px);padding:9px 2px}
   .registryTools summary{display:list-item;cursor:pointer;color:#174d91;font-weight:650;padding:6px 0}
-  .mobileSort{display:block;margin-bottom:8px;font-size:13px}
   #registry .scroll,#calendar .scroll{overflow:visible;max-height:none}
-  #registry table,#calendar table,#registry tbody,#calendar tbody{display:block}
-  #registry thead,#calendar thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-  #registry tbody tr,#calendar tbody tr{display:grid;gap:3px 8px;border:1px solid #dce6f1;border-radius:10px;padding:8px 10px;margin-bottom:6px}
-  #registry tbody tr{grid-template-columns:minmax(0,1fr) auto}
-  #calendar tbody tr{grid-template-columns:minmax(0,1fr) auto}
-  #registry td,#calendar td{display:block;min-width:0;padding:0;border:0;overflow-wrap:anywhere;font-size:13px}
-  #registry td:first-child,#calendar td:first-child{grid-column:1/-1}
-  #registry td:first-child button,#calendar td:first-child button{padding:4px 0;font-size:15px}
-  #registry td:nth-child(2){grid-column:2;grid-row:2;color:#405571;white-space:nowrap}
-  #registry td:nth-child(2)::after{content:" курс"}
-  #registry td:nth-child(3){grid-column:1;grid-row:3;color:#405571}
-  #registry td:nth-child(4){display:none}
-  #registry td:nth-child(5){grid-column:1/-1;grid-row:4}
-  #registry td:nth-child(6){grid-column:1;grid-row:2;color:#174d91;font-weight:650}
-  #calendar td:nth-child(3){text-align:right;white-space:nowrap}
-  #calendar td:last-child{grid-column:1/-1}
 }
 .cardList summary{display:none}.cardList[open] summary{margin-bottom:8px}
 .backupActions,.siteFooter{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 0;padding:0}
@@ -51,6 +34,31 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .metrics .metric{background:white;text-align:left;color:inherit;font-weight:400}
 .metrics .metric:hover,.metrics .metric[aria-pressed=true]{background:#eaf3ff;color:inherit;border-color:#8db3e6}
 .metricSelection{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.profileHead{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
+.cardClose{float:none;margin:0;align-self:start}
+@media(max-width:430px){.profileHead{grid-template-columns:auto minmax(0,1fr)}.cardClose{grid-column:1/-1;grid-row:1;justify-self:end}}
+.cardList summary{display:list-item;cursor:pointer;background:#e9f1fc;color:#15447f;border-radius:8px;padding:10px;font-weight:650}
+.mobileSort{display:block;max-width:320px;margin-bottom:8px;font-size:13px}
+#registry table,#calendar table{display:block}
+#registry thead,#calendar thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#registry tbody,#calendar tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#registry tbody tr,#calendar tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:5px 10px;margin:0;padding:10px 12px;background:#f8fbff;border:1px solid #dce6f1;border-radius:12px}
+#registry tbody tr:hover,#calendar tbody tr:hover{border-color:#a9c5e9}
+#registry td,#calendar td{display:block;min-width:0;padding:0;border:0;font-size:13px;overflow-wrap:anywhere}
+#registry td:first-child,#calendar td:first-child{grid-column:1/-1}
+#registry td:first-child button,#calendar td:first-child button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;color:#173e71;font-size:15px;font-weight:750;text-decoration:none}
+#registry td:first-child button::after,#calendar td:first-child button::after{content:"›";font-size:19px;line-height:1;color:#397bc9}
+#registry td:nth-child(2){grid-column:2;grid-row:2;color:#405571;white-space:nowrap}
+#registry td:nth-child(2)::after{content:" курс"}
+#registry td:nth-child(3){grid-column:1/-1;grid-row:3;color:#405571}
+#registry td:nth-child(4){grid-column:1/-1;grid-row:5;color:#405571}
+#registry td:nth-child(5){grid-column:1/-1;grid-row:4;font-weight:600}
+#registry td:nth-child(6){grid-column:1;grid-row:2}
+.registryStatus{display:inline-block;border-radius:12px;background:#e1edff;color:#174d91;padding:2px 8px;font-weight:650}
+.registryStatus.leave{background:#fff0d5;color:#754b05}.registryStatus.done{background:#e8eff9;color:#405571}.registryStatus.dismissed{background:#ffe5e1;color:#83291e}
+#calendar td:nth-child(3){text-align:right;white-space:nowrap;font-weight:650}
+#calendar td:last-child{grid-column:1/-1}
+@media(max-width:760px){#registry tbody,#calendar tbody{grid-template-columns:minmax(0,1fr)}#registry td:nth-child(4){display:none}}
 </style>
 <main>
 <header><div><h1>Аспіранти НУБіП України</h1></div>
@@ -80,8 +88,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
 <footer class="siteFooter"><span class="footerBlock">© Сергій БОЯРЧУК, 2026</span><a class="footerBlock" href="https://nubip.edu.ua/department/viddil-aspirantury-doktorantury-ta-atestatsiyi-naukovykh-kadriv">Відділ аспірантури, докторантури та атестації наукових кадрів</a></footer>
 </main>
-<dialog id="card"><button class="cardClose" id="closeCard">Закрити</button>
-<div class="profileHead"><span id="avatar" class="avatar"></span><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div></div>
+<dialog id="card">
+<div class="profileHead"><span id="avatar" class="avatar"></span><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div><button class="cardClose" id="closeCard">Закрити</button></div>
 <div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
 <section class="deadlineBox" id="profileDeadline"></section><details><summary>Інші відомості та зміна статусу</summary><dl id="details"></dl></details>
 </dialog>
@@ -325,7 +333,15 @@ function renderRegistry() {
     const row = el("tr");
     for (const field of columns) {
       const cell = el("td");
-      cell.append(field === "Здобувач" ? nameButton(record) : String(display(record,field)));
+      if (field === "Здобувач") {
+        cell.append(nameButton(record));
+      } else if (field === "Контингент") {
+        const badge = el("span",display(record,field));
+        badge.className = "registryStatus "+["active","leave","done","dismissed"][statuses.indexOf(record[field])];
+        cell.append(badge);
+      } else {
+        cell.textContent = display(record,field);
+      }
       row.append(cell);
     }
     return row;
