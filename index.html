@@ -107,6 +107,12 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .newCardFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 12px;margin:0;padding:0 0 10px;border:0;border-bottom:1px solid #dce6f1}
 .newCardFields legend{font-weight:700;margin-bottom:6px}
 .newCardFields .wideField{grid-column:1/-1}
+.newCardChoices{min-width:0;margin:0;padding:0;border:0}
+.newCardChoices legend{margin:0;padding:0;font-size:13px;font-weight:650}
+.newCardChoices label{position:relative;border-radius:8px;padding:7px 9px;background:#e9f1fc;color:#15447f;font-size:12px;cursor:pointer}
+.newCardChoices label:has(input:checked){background:#195bb5;color:white}
+.newCardChoices label:has(input:focus-visible){outline:3px solid #719ee5;outline-offset:2px}
+.newCardChoices input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
 @media(max-width:760px){.registryAdd{width:100%}.newCardFields{grid-template-columns:minmax(0,1fr)}}
 .filterMobileLabel{display:none}
 @media(max-width:760px){
@@ -238,8 +244,17 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Спеціальність<input name="specialty" maxlength="240" required></label>
 <label>Освітньо-наукова програма<input name="program" maxlength="240" required></label>
 <label>ID ОНП<input name="programId" type="number" min="1" step="1" required></label>
-<label>Форма навчання<select name="mode" required><option value="">Виберіть</option><option>Денна</option><option>Вечірня</option><option>Заочна</option><option>Поза аспірантурою</option></select></label>
-<label>Джерело фінансування<select name="funding" required><option value="">Виберіть</option><option>Бюджет</option><option>Контракт</option><option>Проєктна аспірантура</option></select></label>
+<fieldset class="newCardChoices wideField"><legend>Форма навчання</legend><div class="filterChoices">
+<label><input type="radio" name="mode" value="Денна" required>Денна</label>
+<label><input type="radio" name="mode" value="Вечірня">Вечірня</label>
+<label><input type="radio" name="mode" value="Заочна">Заочна</label>
+<label><input type="radio" name="mode" value="Поза аспірантурою">Поза аспірантурою</label>
+</div></fieldset>
+<fieldset class="newCardChoices wideField"><legend>Джерело фінансування</legend><div class="filterChoices">
+<label><input type="radio" name="funding" value="Бюджет" required>Бюджет</label>
+<label><input type="radio" name="funding" value="Контракт">Контракт</label>
+<label><input type="radio" name="funding" value="Проєктна аспірантура">Проєктна аспірантура</label>
+</div></fieldset>
 <label>Дата завершення навчання<input name="studyEnd" type="date" required></label>
 </fieldset>
 <fieldset class="newCardFields"><legend>Поновлення з іншого ЗВО</legend>
