@@ -122,6 +122,12 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .profileMore>summary:hover{background:#ccdef7}
 .syncTools{align-items:center;margin:10px 0}.syncTools span{font-size:13px;color:#405571}
 @media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{padding-inline:6px}}
+.calendarSections{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
+.calendarSections a{border-radius:8px;padding:8px 11px;background:#e9f1fc;color:#15447f;text-decoration:none;font-weight:650;font-size:13px}
+.calendarSections a:hover{background:#dceaff}
+.calendarSection{margin:0 0 16px;scroll-margin-top:10px}
+.calendarSection h2{margin:0 0 8px;padding:8px 11px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:16px}
+.calendarSection p{margin:8px 0;color:#405571}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -144,7 +150,17 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 </div>
 <div id="calendar" hidden>
 <label>Станом на <input id="asOf" type="date" style="max-width:180px"></label>
+<nav class="calendarSections" aria-label="Розділи календаря"><a href="#leaveCalendar">Закінчення академвідпустки</a><a href="#studyCalendar">Завершення навчання</a></nav>
+<section class="calendarSection" id="leaveCalendar" aria-labelledby="leaveCalendarTitle">
+<h2 id="leaveCalendarTitle">Закінчення академвідпустки</h2>
+<p id="emptyLeaveCalendar" hidden>На вибрану дату немає строків академвідпусток для контролю.</p>
 <div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="eventBody"></tbody></table></div>
+</section>
+<section class="calendarSection" id="studyCalendar" aria-labelledby="studyCalendarTitle">
+<h2 id="studyCalendarTitle">Завершення навчання</h2>
+<p id="emptyStudyCalendar" hidden>На вибрану дату немає строків завершення навчання для контролю.</p>
+<div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="studyEventBody"></tbody></table></div>
+</section>
 </div>
 </section>
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
@@ -189,7 +205,8 @@ const statusActions = [
   {id:"dismiss",label:"Відрахувати",target:DISMISSED}
 ];
 const storageKey = "aspirantura-nubip.registry.v1";
-const sync = {api:null,uid:null,revision:null,ready:false,busy:false,unsubscribe:null};
+const sync = {api:null,uid:null,role:null,revision:null,ready:false,busy:false,unsubscribe:null,unsubscribeAccess:null};
+const canEdit = () => !sync.uid || sync.role === "owner";
 const leaveStatuses = new Set(["Надано академвідпустку", "Продовжено академвідпустку"]);
 const fields = ["ID картки","ID ФО","Здобувач","Дата народження","Курс","Структурний підрозділ","Спеціальність","ID ОП","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання","Початок навчання","Завершення навчання"];
 const leaveFields = ["Статус по","Підстави надання академічної відпустки"];
@@ -612,17 +629,23 @@ function renderRegistry() {
 }
 function renderCalendar() {
   const events = $("asOf").value ? deadlines(cards,$("asOf").value) : [];
-  $("eventBody").replaceChildren(...events.map(event => {
+  const leaveRows = [], studyRows = [];
+  for (const event of events) {
     const row = el("tr"), person = el("td"), status = el("td"), pill = el("span",event.status);
     person.append(nameButton(event.card));
     pill.className = "pill "+(event.urgent ? "urgent" : event.review ? "review" : "");
     status.append((event.name === LEAVE_END_EVENT || event.study) && Number.isFinite(event.days)
       ? countdown(event.days,event.study) : pill);
     row.append(person,el("td",event.name),el("td",formatDate(event.due)),status);
-    return row;
-  }));
+    (event.name === LEAVE_END_EVENT ? leaveRows : studyRows).push(row);
+  }
+  $("eventBody").replaceChildren(...leaveRows);
+  $("studyEventBody").replaceChildren(...studyRows);
+  $("emptyLeaveCalendar").hidden = Boolean(leaveRows.length);
+  $("emptyStudyCalendar").hidden = Boolean(studyRows.length);
 }
 function editStatus(record) {
+  if (!canEdit()) return;
   const dialog = $("statusDialog"), form = $("statusForm");
   const current = record["Контингент"];
   const options = statusActions.filter(action => action.id === "extend" ? current === LEAVE : action.target !== current);
@@ -787,11 +810,12 @@ function setCards(next,reset = false) {
   if (reset) filters.clear();
   else pruneFilters(filters);
   if (reset) $("search").value = "";
-  $("export").disabled = $("backup").disabled = !cards.length;
+  updateWriteControls();
   renderMetrics(); renderRegistry(); renderCalendar();
 }
 async function saveCards(next,transfer = false) {
   if (sync.uid) {
+    if (sync.role !== "owner") throw Error("Спільний реєстр доступний лише для перегляду.");
     if (!sync.ready || sync.revision === null || sync.busy) throw Error("Дочекайтеся підключення або завершення синхронізації.");
     if (!transfer && sync.revision === 0 && localCards().length) {
       throw Error("Спочатку перенесіть локальний реєстр у спільне сховище.");
@@ -835,8 +859,24 @@ function updateSyncControls(message) {
   $("syncLogin").hidden = Boolean(sync.uid);
   $("syncLogout").hidden = !sync.uid;
   $("syncLogout").disabled = sync.busy;
-  $("syncTransfer").hidden = !sync.uid || sync.revision !== 0 || !localCards().length;
+  $("syncTransfer").hidden = sync.role !== "owner" || sync.revision !== 0 || !localCards().length;
   $("syncTransfer").disabled = sync.busy || !sync.ready;
+  updateWriteControls();
+}
+function updateWriteControls() {
+  const editable = canEdit();
+  $("pick").disabled = $("restore").disabled = !editable;
+  $("export").disabled = $("backup").disabled = !editable || !cards.length;
+  $("changeStatus").hidden = !editable;
+}
+function clearSharedView() {
+  $("statusDialog").close();
+  $("statusForm").reset();
+  $("card").close();
+  for (const id of ["person","profileLine","profileCardNumber","profileBadges","cardTabs","profileFacts","profileDeadline","details"]) $(id).replaceChildren();
+  $("search").value = "";
+  selectedMetric = null;
+  setCards([],true);
 }
 async function setupSync() {
   if (location.protocol !== "https:") return;
@@ -860,29 +900,53 @@ async function setupSync() {
     };
     api.observe(user => {
       sync.unsubscribe?.();
+      sync.unsubscribeAccess?.();
       sync.unsubscribe = null;
-      sync.uid = api.isOwner(user) ? user.uid : null;
+      sync.unsubscribeAccess = null;
+      sync.uid = user?.uid ?? null;
+      sync.role = null;
       sync.revision = null;
       sync.ready = false;
+      clearSharedView();
       if (!sync.uid) {
         setCards(localCards());
-        updateSyncControls(user ? "Доступ до спільного реєстру дозволено лише власнику." : "Локальний режим. Увійдіть для синхронізації.");
+        updateSyncControls("Локальний режим. Увійдіть для синхронізації.");
         return;
       }
       const uid = sync.uid;
-      updateSyncControls("Підключаємо спільний реєстр…");
-      sync.unsubscribe = api.subscribe(({cards:remote,revision}) => {
-        if (sync.uid !== uid || (sync.revision !== null && revision < sync.revision)) return;
-        const needsTransfer = revision === 0 && localCards().length;
-        sync.revision = revision;
-        sync.ready = true;
-        if (!needsTransfer) setCards(decodeBackup(remote));
-        updateSyncControls(needsTransfer ? "Спільний реєстр порожній. Перенесіть локальну копію один раз." : "Реєстр синхронізовано.");
-      },error => {
+      const fail = error => {
         if (sync.uid !== uid) return;
+        sync.unsubscribe?.();
+        sync.unsubscribe = null;
         sync.ready = false;
+        sync.revision = null;
+        clearSharedView();
         updateSyncControls(api.errorText(error));
-      });
+      };
+      updateSyncControls("Перевіряємо доступ до спільного реєстру…");
+      sync.unsubscribeAccess = api.observeAccess(user,role => {
+        if (sync.uid !== uid || (sync.role === role && sync.unsubscribe)) return;
+        sync.unsubscribe?.();
+        sync.unsubscribe = null;
+        sync.role = role;
+        sync.revision = null;
+        sync.ready = false;
+        if (!role) {
+          clearSharedView();
+          updateSyncControls("Цей Google-акаунт не має доступу до спільного реєстру.");
+          return;
+        }
+        updateSyncControls("Підключаємо спільний реєстр…");
+        sync.unsubscribe = api.subscribe(({cards:remote,revision}) => {
+          if (sync.uid !== uid || sync.role !== role || (sync.revision !== null && revision < sync.revision)) return;
+          const needsTransfer = role === "owner" && revision === 0 && localCards().length;
+          sync.revision = revision;
+          sync.ready = true;
+          setCards(needsTransfer ? localCards() : decodeBackup(remote));
+          updateSyncControls(needsTransfer ? "Спільний реєстр порожній. Перенесіть локальну копію один раз."
+            : role === "viewer" ? "Спільний реєстр · перегляд" : "Реєстр синхронізовано.");
+        },fail);
+      },fail);
     });
   } catch {
     $("syncTools").hidden = false;
@@ -1025,7 +1089,7 @@ function setup() {
         ? "Не вдалося прочитати XLSX. Перевірте файл або відкрийте застосунок у сучасному Edge чи Chrome."
         : error.message;
     } finally {
-      $("pick").disabled = false;
+      updateWriteControls();
       $("files").value = "";
     }
   };

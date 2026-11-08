@@ -14,10 +14,21 @@ const encoder = new TextEncoder();
 const maxChunk = 160000;
 const maxChunks = 32;
 
-export const isOwner = user => user?.email === owner && user.emailVerified
-  && user.providerData.some(provider => provider.providerId === "google.com");
+const isGoogleUser = user => Boolean(user?.email && user.emailVerified
+  && user.providerData.some(provider => provider.providerId === "google.com"));
+const isOwner = user => isGoogleUser(user) && user.email === owner;
 export const observe = callback => onAuthStateChanged(auth,callback);
 export const logout = () => signOut(auth);
+export function observeAccess(user,receive,fail) {
+  if (!isGoogleUser(user) || isOwner(user)) {
+    receive(isOwner(user) ? "owner" : null);
+    return () => {};
+  }
+  return onSnapshot(doc(database,"workspaces","aspirantura-nubip","viewers",user.email),
+    {includeMetadataChanges:true},snapshot => {
+      if (!snapshot.metadata.fromCache) receive(snapshot.data()?.enabled === true ? "viewer" : null);
+    },fail);
+}
 export async function login() {
   await setPersistence(auth,browserLocalPersistence);
   const provider = new GoogleAuthProvider();
@@ -26,8 +37,8 @@ export async function login() {
 }
 
 function ledger() {
-  if (!isOwner(auth.currentUser)) throw Error("Увійдіть як власник реєстру.");
-  return collection(database,"owners",auth.currentUser.uid,"registry");
+  if (!isGoogleUser(auth.currentUser)) throw Error("Увійдіть через підтверджений Google-акаунт.");
+  return collection(database,"workspaces","aspirantura-nubip","registry");
 }
 
 export function subscribe(receive,fail) {
@@ -80,6 +91,7 @@ function pack(cards) {
 }
 
 export async function save(cards,revision) {
+  if (!isOwner(auth.currentUser)) throw Error("Змінювати спільний реєстр може лише власник.");
   const ref = ledger(), metaRef = doc(ref,"meta"), chunks = pack(cards);
   const next = revision+1;
   await runTransaction(database,async transaction => {
