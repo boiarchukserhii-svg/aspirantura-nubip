@@ -103,6 +103,11 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 #openFilters{text-align:left;min-height:42px;background:white;border:1px solid #a9c5e9;padding-inline:12px}
 #registryList{margin-top:12px;padding-top:12px;border-top:1px solid #dce6f1}
 #registryList>summary{padding-inline:12px}
+.registryAdd{margin:8px 0 12px}
+.newCardFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 12px;margin:0;padding:0 0 10px;border:0;border-bottom:1px solid #dce6f1}
+.newCardFields legend{font-weight:700;margin-bottom:6px}
+.newCardFields .wideField{grid-column:1/-1}
+@media(max-width:760px){.registryAdd{width:100%}.newCardFields{grid-template-columns:minmax(0,1fr)}}
 .filterMobileLabel{display:none}
 @media(max-width:760px){
   .registryControls{display:grid;grid-template-columns:minmax(0,1fr)}
@@ -155,7 +160,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="metricSelection" id="metricSelection" hidden><strong id="metricSelectionLabel"></strong><button id="clearMetric">Показати всі картки</button></div>
 <div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="search" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="activeFilterCount"></span></button></div>
 <div class="activeFilters" id="activeFilters" aria-label="Активні фільтри" hidden></div>
-<details class="cardList" id="registryList" open><summary>Картки здобувачів</summary><p id="emptyRegistry" hidden></p><div class="scroll"><table><thead id="registryHead"></thead><tbody id="registryBody"></tbody></table></div></details>
+<details class="cardList" id="registryList" open><summary>Картки здобувачів</summary><button type="button" id="addCard" class="primary registryAdd" aria-haspopup="dialog">+ Додати картку</button><p id="emptyRegistry" hidden></p><div class="scroll"><table><thead id="registryHead"></thead><tbody id="registryBody"></tbody></table></div></details>
 </div>
 <div id="calendar" hidden>
 <label>Станом на <input id="asOf" type="date" style="max-width:180px"></label>
@@ -217,6 +222,34 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Дата видачі<input id="diplomaDate" type="date" required></label>
 <p id="diplomaError" role="alert" hidden></p>
 <div class="statusFormActions"><button type="button" id="cancelDiploma">Скасувати</button><button type="submit" id="saveDiploma" class="primary">Зберегти зміни</button></div>
+</form>
+</dialog>
+<dialog id="newCardDialog" aria-labelledby="newCardTitle">
+<h2 id="newCardTitle">Додати картку</h2>
+<form id="newCardForm" class="statusForm">
+<fieldset class="newCardFields"><legend>Здобувач</legend>
+<label class="wideField">ПІБ<input name="name" maxlength="240" required></label>
+<label>ID особи в ЄДЕБО<input name="personId" type="number" min="1" step="1" required></label>
+<label>ID картки в ЄДЕБО<input name="cardId" type="number" min="1" step="1" required></label>
+</fieldset>
+<fieldset class="newCardFields"><legend>Навчання</legend>
+<label>Курс<input name="course" type="number" min="1" step="1" required></label>
+<label>Структурний підрозділ<input name="department" maxlength="240" required></label>
+<label>Спеціальність<input name="specialty" maxlength="240" required></label>
+<label>Освітньо-наукова програма<input name="program" maxlength="240" required></label>
+<label>ID ОНП<input name="programId" type="number" min="1" step="1" required></label>
+<label>Форма навчання<select name="mode" required><option value="">Виберіть</option><option>Денна</option><option>Вечірня</option><option>Заочна</option><option>Поза аспірантурою</option></select></label>
+<label>Джерело фінансування<select name="funding" required><option value="">Виберіть</option><option>Бюджет</option><option>Контракт</option><option>Проєктна аспірантура</option></select></label>
+<label>Дата завершення навчання<input name="studyEnd" type="date" required></label>
+</fieldset>
+<fieldset class="newCardFields"><legend>Поновлення з іншого ЗВО</legend>
+<label class="wideField">Попередній ЗВО<input name="previousUniversity" maxlength="240" required></label>
+<label>Дата поновлення<input name="effective" type="date" required></label>
+<label>Номер наказу<input name="orderNumber" maxlength="80" required></label>
+<label>Дата наказу<input name="orderDate" type="date" required></label>
+</fieldset>
+<p id="newCardError" role="alert" hidden></p>
+<div class="statusFormActions"><button type="button" id="cancelNewCard">Скасувати</button><button type="submit" id="saveNewCard" class="primary">Додати картку</button></div>
 </form>
 </dialog>
 <dialog id="filterDialog" aria-labelledby="filterTitle">
@@ -970,6 +1003,7 @@ function openCard(selected) {
       }
       if (entry.leaveEnd) item.append(el("div",`Відпустка до ${formatDate(entry.leaveEnd)}`));
       if (entry.reason) item.append(el("div",entry.reason));
+      if (entry.previousUniversity) item.append(el("div",`Попередній ЗВО · ${entry.previousUniversity}`));
       if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
       if (Number.isInteger(entry.courseTo)) item.append(el("div",`${entry.courseFrom} курс → ${entry.courseTo} курс`));
       if (cancelled.has(index)) {
@@ -1012,6 +1046,57 @@ function openCard(selected) {
   }));
   select(selected);
   if (!$("card").open) $("card").showModal();
+}
+function openNewCard() {
+  if (!canEdit()) return;
+  const form = $("newCardForm"), dialog = $("newCardDialog"), errorBox = $("newCardError");
+  form.reset();
+  errorBox.hidden = true;
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (!canEdit() || $("saveNewCard").disabled) return;
+    const values = new FormData(form);
+    const value = name => String(values.get(name) ?? "").trim();
+    const cardId = Number(value("cardId")), personId = Number(value("personId"));
+    const course = Number(value("course")), programId = Number(value("programId"));
+    const effective = value("effective"), studyEnd = value("studyEnd");
+    try {
+      if ([cardId,personId,course,programId].some(number => !Number.isSafeInteger(number) || number < 1)) {
+        throw Error("Вкажіть додатні цілі числа для ідентифікаторів і курсу.");
+      }
+      if (cards.some(card => card["ID картки"] === cardId)) {
+        throw Error("Картка з таким ID уже є в реєстрі. Відкрийте її для внесення змін.");
+      }
+      if (["name","department","specialty","program","previousUniversity","orderNumber"].some(name => !value(name))) {
+        throw Error("Заповніть усі обов’язкові поля.");
+      }
+      if (studyEnd < effective) throw Error("Дата завершення навчання має бути в день поновлення або пізніше.");
+      const card = {
+        "ID картки":cardId,"ID ФО":personId,"Здобувач":value("name"),"Дата народження":null,"Курс":course,
+        "Структурний підрозділ":value("department"),"Спеціальність":value("specialty"),"ID ОП":programId,
+        "Освітня програма":value("program"),"Форма навчання":value("mode"),"Джерело фінансування":value("funding"),
+        "Статус навчання":null,"Початок навчання":effective,"Завершення навчання":studyEnd,
+        "Статус по":null,[leaveFields[1]]:null,"Контингент":ACTIVE,manualStatus:true,
+        statusHistory:[{action:"Поновлено з іншого ЗВО",from:null,to:ACTIVE,date:effective,studyEnd,
+          previousUniversity:value("previousUniversity"),orderNumber:value("orderNumber"),orderDate:value("orderDate")}]
+      };
+      $("saveNewCard").disabled = $("cancelNewCard").disabled = true;
+      const saved = await saveCards([...cards,card]);
+      showNotice(saved ? "Картку додано до реєстру." : "Картку додано у вкладці. Збережіть копію реєстру.",!saved);
+      selectedMetric = null;
+      filters.clear();
+      $("search").value = "";
+      renderRegistry();
+      dialog.close();
+      openCard(card);
+    } catch (error) {
+      errorBox.textContent = sync.api?.errorText(error) ?? error.message;
+      errorBox.hidden = false;
+    } finally {
+      $("saveNewCard").disabled = $("cancelNewCard").disabled = false;
+    }
+  };
+  dialog.showModal();
 }
 function setCards(next,reset = false) {
   cards = next.map(card => card["Джерело фінансування"] === "Проектна аспірантура"
@@ -1081,8 +1166,11 @@ function updateWriteControls() {
   $("export").disabled = $("backup").disabled = !editable || !cards.length;
   $("changeStatus").hidden = !editable;
   $("editDiploma").hidden = !editable;
+  $("addCard").hidden = !editable;
 }
 function clearSharedView() {
+  $("newCardDialog").close();
+  $("newCardForm").reset();
   $("diplomaDialog").close();
   $("diplomaForm").reset();
   $("orderDialog").close();
@@ -1232,6 +1320,11 @@ function decodeBackup(data) {
   return data;
 }
 function setup() {
+  $("addCard").onclick = openNewCard;
+  $("cancelNewCard").onclick = () => $("newCardDialog").close();
+  $("newCardDialog").addEventListener("cancel",event => {
+    if ($("saveNewCard").disabled) event.preventDefault();
+  });
   const mobile = matchMedia("(max-width:760px)");
   const setFilterVisibility = () => {
     $("registryList").open = !mobile.matches;
