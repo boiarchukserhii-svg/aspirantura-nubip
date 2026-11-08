@@ -184,6 +184,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <h2 id="statusTitle">Змінити статус</h2>
 <form id="statusForm" class="statusForm">
 <fieldset class="statusActionGroup"><legend>Виберіть дію</legend><div class="filterChoices" id="statusActions"></div></fieldset>
+<p id="promotionPreview" hidden></p>
 <label>Дата набрання чинності<input id="statusEffective" type="date" required></label>
 <label id="leaveEndLabel" hidden>Академвідпустка до<input id="statusLeaveEnd" type="date"></label>
 <label id="leaveReasonLabel" hidden>Підстава академвідпустки<input id="statusLeaveReason" maxlength="240"></label>
@@ -214,6 +215,7 @@ const COMPLETED = "Завершив(-ла) навчання", DISMISSED = "Ві�
 const COMPLETION_YEAR = 2027;
 const statuses = [ACTIVE,LEAVE,COMPLETED,DISMISSED];
 const statusActions = [
+  {id:"promote",label:"Перевести на наступний рік навчання",target:ACTIVE},
   {id:"leave",label:"Надати академвідпустку",target:LEAVE},
   {id:"extend",label:"Продовжити академвідпустку",target:LEAVE},
   {id:"resume",label:"Поновити навчання",target:ACTIVE},
@@ -664,7 +666,12 @@ function editStatus(record) {
   if (!canEdit()) return;
   const dialog = $("statusDialog"), form = $("statusForm");
   const current = record["Контингент"];
-  const options = statusActions.filter(action => action.id === "extend" ? current === LEAVE : action.target !== current);
+  const course = Number(record["Курс"]);
+  const options = statusActions.filter(action => {
+    if (action.id === "promote") return current === ACTIVE && Number.isSafeInteger(course) && course >= 1 && course < Number.MAX_SAFE_INTEGER;
+    if (action.id === "extend") return current === LEAVE;
+    return action.target !== current;
+  });
   form.reset();
   let selectedAction = null;
   $("statusActions").replaceChildren(...options.map(action => {
@@ -685,6 +692,8 @@ function editStatus(record) {
   function validate() {
     const action = selectedAction;
     $("saveStatus").disabled = !action;
+    $("promotionPreview").hidden = action?.id !== "promote";
+    $("promotionPreview").textContent = action?.id === "promote" ? `${course} курс → ${course+1} курс` : "";
     const leave = action?.target === LEAVE, extend = action?.id === "extend";
     $("leaveEndLabel").hidden = !leave;
     $("statusLeaveEnd").required = leave;
@@ -728,6 +737,21 @@ function editStatus(record) {
     }
     if (action.id === "resume" && $("statusStudyEnd").value) {
       entry.studyEnd = updated["Завершення навчання"] = $("statusStudyEnd").value;
+    }
+    if (action.id === "promote") {
+      const history = record.statusHistory ?? [];
+      const duplicate = history.some((past,index) => {
+        if (!Number.isInteger(past.courseTo) || history.some(item => item.undoOf === index)) return false;
+        const order = history.findLast(item => item.correctionOf === index) ?? past;
+        return [past,order].some(item => item.orderNumber === entry.orderNumber && item.orderDate === entry.orderDate);
+      });
+      if (duplicate) {
+        alert("Переведення за цим наказом уже внесено до картки.");
+        return;
+      }
+      entry.courseFrom = course;
+      entry.courseTo = updated["Курс"] = course+1;
+      entry.action = "Переведено на наступний рік навчання";
     }
     updated.statusHistory = [...(record.statusHistory ?? []),entry];
     form.dataset.saving = "true";
@@ -795,8 +819,10 @@ function correctOrder(record,index,currentOrder) {
 }
 async function undoStatus(record,index,entry,order,button) {
   const previous = entry.previous ?? {status:entry.from};
-  if (!confirm(`Скасувати зміну «${entry.action}» та відновити статус «${previous.status}»?`)) return;
+  const restoreLabel = Number.isInteger(entry.courseFrom) ? `курс ${entry.courseFrom}` : `статус «${previous.status}»`;
+  if (!confirm(`Скасувати зміну «${entry.action}» та відновити ${restoreLabel}?`)) return;
   const updated = {...record,"Контингент":previous.status,manualStatus:true};
+  if (Number.isInteger(entry.courseFrom)) updated["Курс"] = entry.courseFrom;
   if (entry.previous) {
     if (entry.leaveEnd) updated["Статус по"] = previous.leaveEnd;
     if (entry.reason) updated[leaveFields[1]] = previous.reason;
@@ -879,6 +905,7 @@ function openCard(selected) {
       if (entry.leaveEnd) item.append(el("div",`Відпустка до ${formatDate(entry.leaveEnd)}`));
       if (entry.reason) item.append(el("div",entry.reason));
       if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
+      if (Number.isInteger(entry.courseTo)) item.append(el("div",`${entry.courseFrom} курс → ${entry.courseTo} курс`));
       if (cancelled.has(index)) {
         const marker = el("strong","Скасовано");
         marker.className = "cancelledStatus";
@@ -1093,6 +1120,7 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
       if (history.length) updated.statusHistory = history;
       if (history.some(entry => entry.leaveEnd)) for (const field of leaveFields) updated[field] = old[field];
       if (history.some(entry => entry.studyEnd)) updated["Завершення навчання"] = old["Завершення навчання"];
+      if (history.some(entry => Number.isInteger(entry.courseTo))) updated["Курс"] = old["Курс"];
       merged.set(key,updated);
     } else merged.set(key,card);
   }
