@@ -124,12 +124,16 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .syncTools{align-items:center;margin:10px 0}.syncTools span{font-size:13px;color:#405571}
 .syncTools .syncBadge{display:inline-block;border-radius:8px;padding:9px 13px;background:#e9f1fc;color:#15447f;font:inherit;font-weight:650}
 @media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{padding-inline:6px}}
-.calendarSections{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
-.calendarSections a{border-radius:8px;padding:8px 11px;background:#e9f1fc;color:#15447f;text-decoration:none;font-weight:650;font-size:13px}
-.calendarSections a:hover{background:#dceaff}
-.calendarSection{margin:0 0 16px;scroll-margin-top:10px}
-.calendarSection h2{margin:0 0 8px;padding:8px 11px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:16px}
+.calendarSections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px;margin-top:12px}
+.calendarSection{min-width:0}
+.calendarSection>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:46px;padding:10px 14px;border-radius:9px;background:#e9f1fc;color:#174d91;font-size:15px;font-weight:700;cursor:pointer}
+.calendarSection>summary:hover{background:#dceaff}
+.calendarSection>summary::after{content:"+";font-size:19px;line-height:1}
+.calendarSection[open]>summary{margin-bottom:8px}
+.calendarSection[open]>summary::after{content:"−"}
+#calendar .calendarSection tbody{grid-template-columns:minmax(0,1fr)}
 .calendarSection p{margin:8px 0;color:#405571}
+@media(max-width:760px){.calendarSections{grid-template-columns:minmax(0,1fr);gap:8px}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -152,17 +156,18 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 </div>
 <div id="calendar" hidden>
 <label>Станом на <input id="asOf" type="date" style="max-width:180px"></label>
-<nav class="calendarSections" aria-label="Розділи календаря"><a href="#leaveCalendar">Закінчення академвідпустки</a><a href="#studyCalendar">Завершення навчання</a></nav>
-<section class="calendarSection" id="leaveCalendar" aria-labelledby="leaveCalendarTitle">
-<h2 id="leaveCalendarTitle">Закінчення академвідпустки</h2>
+<div class="calendarSections">
+<details class="calendarSection" id="leaveCalendar">
+<summary>Закінчення академічної відпустки</summary>
 <p id="emptyLeaveCalendar" hidden>На вибрану дату немає строків академвідпусток для контролю.</p>
 <div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="eventBody"></tbody></table></div>
-</section>
-<section class="calendarSection" id="studyCalendar" aria-labelledby="studyCalendarTitle">
-<h2 id="studyCalendarTitle">Завершення навчання</h2>
+</details>
+<details class="calendarSection" id="studyCalendar">
+<summary>Завершення навчання</summary>
 <p id="emptyStudyCalendar" hidden>На вибрану дату немає строків завершення навчання для контролю.</p>
 <div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="studyEventBody"></tbody></table></div>
-</section>
+</details>
+</div>
 </div>
 </section>
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
