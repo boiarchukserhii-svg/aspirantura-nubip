@@ -881,9 +881,9 @@ function clearSharedView() {
 async function setupSync() {
   if (location.protocol !== "https:") return;
   try {
-    const config = await import("./sync-config.js");
+    const config = await import("./sync-config.js?v=34");
     if (!config.firebaseConfig) return;
-    const api = sync.api = await import("./sync.js");
+    const api = sync.api = await import("./sync.js?v=34");
     $("syncTools").hidden = false;
     updateSyncControls("Локальний режим. Увійдіть для синхронізації.");
     $("syncLogin").onclick = async () => {
@@ -1123,7 +1123,7 @@ if (location.protocol === "https:" || location.hostname === "localhost") {
     }
   };
   window.addEventListener("appinstalled",() => { $("installation").hidden = true; });
-  navigator.serviceWorker?.register("./service-worker.js").catch(() => {});
+  navigator.serviceWorker?.register("./service-worker.js",{updateViaCache:"none"}).catch(() => {});
 }
 </script>
 </html>

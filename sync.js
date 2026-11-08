@@ -3,7 +3,7 @@ import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged,se
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {getFirestore,collection,doc,onSnapshot,runTransaction}
   from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import {firebaseConfig} from "./sync-config.js";
+import {firebaseConfig} from "./sync-config.js?v=34";
 
 if (!firebaseConfig) throw Error("Синхронізацію ще не підключено до Firebase.");
 const app = initializeApp(firebaseConfig,"aspirantura-nubip");
