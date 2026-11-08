@@ -122,6 +122,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .profileMore>summary::after{content:"+"}.profileMore[open]>summary::after{content:"−"}
 .profileMore>summary:hover{background:#ccdef7}
 .syncTools{align-items:center;margin:10px 0}.syncTools span{font-size:13px;color:#405571}
+.syncTools .syncBadge{display:inline-block;border-radius:8px;padding:9px 13px;background:#e9f1fc;color:#15447f;font:inherit;font-weight:650}
 @media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{padding-inline:6px}}
 .calendarSections{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
 .calendarSections a{border-radius:8px;padding:8px 11px;background:#e9f1fc;color:#15447f;text-decoration:none;font-weight:650;font-size:13px}
@@ -940,7 +941,7 @@ async function saveCards(next,transfer = false) {
         sync.revision = revision;
         setCards(next);
       }
-      updateSyncControls("Реєстр синхронізовано.");
+      updateSyncControls("Реєстр синхронізовано");
       return true;
     } catch (error) {
       updateSyncControls(sync.api.errorText(error));
@@ -965,7 +966,10 @@ function localCards() {
   } catch { return []; }
 }
 function updateSyncControls(message) {
-  if (message !== undefined) $("syncStatus").textContent = message;
+  if (message !== undefined) {
+    $("syncStatus").textContent = message;
+    $("syncStatus").classList.toggle("syncBadge",message === "Реєстр синхронізовано");
+  }
   $("syncLogin").hidden = Boolean(sync.uid);
   $("syncLogout").hidden = !sync.uid;
   $("syncLogout").disabled = sync.busy;
@@ -1056,7 +1060,7 @@ async function setupSync() {
           sync.ready = true;
           setCards(needsTransfer ? localCards() : decodeBackup(remote));
           updateSyncControls(needsTransfer ? "Спільний реєстр порожній. Перенесіть локальну копію один раз."
-            : role === "viewer" ? "Спільний реєстр · перегляд" : "Реєстр синхронізовано.");
+            : role === "viewer" ? "Спільний реєстр · перегляд" : "Реєстр синхронізовано");
         },fail);
       },fail);
     });
