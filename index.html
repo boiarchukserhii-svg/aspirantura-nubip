@@ -111,6 +111,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 @media(max-width:760px){#filterDialog{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:85dvh;border-radius:16px 16px 0 0}}
 .statusTools{margin:12px 0}.statusForm{display:grid;gap:10px}.statusForm label{font-size:13px;font-weight:650}.statusForm input,.statusForm select{font-size:16px}.statusFormActions{display:flex;gap:8px;justify-content:flex-end;margin-top:5px}
 .statusHistory ol{margin:0;padding-inline-start:18px}.statusHistory li{margin-bottom:8px;overflow-wrap:anywhere}
+.statusHistoryActions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.statusHistoryActions button{font-size:12px;padding:6px 8px}.cancelledStatus{color:#83291e}
 .statusActionGroup{min-width:0;margin:0;padding:0;border:0}.statusActionGroup legend{font-size:13px;font-weight:650}
 .statusActionGroup .filterChoices{display:grid;grid-template-columns:minmax(0,1fr)}.statusActionGroup .filterChoices button{text-align:left}
 .profileCardNumber{display:grid;gap:2px;min-width:0;padding:6px 8px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:center}
@@ -184,6 +185,15 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Номер наказу<input id="statusOrderNumber" maxlength="80" required></label>
 <label>Дата наказу<input id="statusOrderDate" type="date" required></label>
 <div class="statusFormActions"><button type="button" id="cancelStatus">Скасувати</button><button type="submit" id="saveStatus" class="primary">Зберегти зміни</button></div>
+</form>
+</dialog>
+<dialog id="orderDialog" aria-labelledby="orderTitle">
+<h2 id="orderTitle">Виправити реквізити</h2>
+<form id="orderForm" class="statusForm">
+<label>Номер наказу<input id="correctOrderNumber" maxlength="80" required></label>
+<label>Дата наказу<input id="correctOrderDate" type="date" required></label>
+<p id="orderError" role="alert" hidden></p>
+<div class="statusFormActions"><button type="button" id="closeOrder">Скасувати</button><button type="submit" id="saveOrder" class="primary">Зберегти зміни</button></div>
 </form>
 </dialog>
 <dialog id="filterDialog" aria-labelledby="filterTitle">
@@ -703,7 +713,9 @@ function editStatus(record) {
     }
     const updated = {...record,"Контингент":action.target,manualStatus:true};
     const entry = {action:action.label,from:current,to:action.target,date:$("statusEffective").value,
-      orderNumber:$("statusOrderNumber").value.trim(),orderDate:$("statusOrderDate").value};
+      orderNumber:$("statusOrderNumber").value.trim(),orderDate:$("statusOrderDate").value,
+      previous:{status:current,leaveEnd:record["Статус по"] ?? null,
+        reason:record[leaveFields[1]] ?? null,studyEnd:record["Завершення навчання"] ?? null}};
     if (action.target === LEAVE) {
       entry.leaveEnd = updated["Статус по"] = $("statusLeaveEnd").value;
       if (action.id === "leave") entry.reason = updated[leaveFields[1]] = $("statusLeaveReason").value.trim();
@@ -729,6 +741,67 @@ function editStatus(record) {
     openCard(updated);
   };
   dialog.showModal();
+}
+
+async function saveHistoryEdit(record,updated) {
+  if (!canEdit()) throw Error("Змінювати спільний реєстр може лише власник.");
+  const latest = cards.find(card => card["ID картки"] === record["ID картки"]);
+  if (JSON.stringify(latest) !== JSON.stringify(record)) throw Error("Цю картку вже оновлено. Відкрийте її з реєстру повторно.");
+  const saved = await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
+  showNotice(saved ? "Історію картки оновлено." : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
+  if ($("card").open) openCard(updated);
+}
+function correctOrder(record,index,currentOrder) {
+  const dialog = $("orderDialog"), form = $("orderForm"), errorBox = $("orderError");
+  const number = $("correctOrderNumber"), date = $("correctOrderDate");
+  number.value = currentOrder.orderNumber;
+  date.value = currentOrder.orderDate;
+  number.setCustomValidity("");
+  number.oninput = () => number.setCustomValidity("");
+  errorBox.hidden = true;
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if ($("saveOrder").disabled) return;
+    const orderNumber = number.value.trim(), orderDate = date.value;
+    if (!orderNumber) {
+      number.setCustomValidity("Вкажіть номер наказу.");
+      number.reportValidity();
+      return;
+    }
+    if (orderNumber === currentOrder.orderNumber && orderDate === currentOrder.orderDate) {
+      dialog.close();
+      return;
+    }
+    const entry = {action:"Виправлено реквізити",date:orderDate,orderNumber,orderDate,correctionOf:index};
+    $("saveOrder").disabled = $("closeOrder").disabled = true;
+    errorBox.hidden = true;
+    try {
+      await saveHistoryEdit(record,{...record,manualStatus:true,statusHistory:[...record.statusHistory,entry]});
+      dialog.close();
+    } catch (error) {
+      errorBox.textContent = sync.api?.errorText(error) ?? error.message;
+      errorBox.hidden = false;
+    } finally {
+      $("saveOrder").disabled = $("closeOrder").disabled = false;
+    }
+  };
+  dialog.showModal();
+}
+async function undoStatus(record,index,entry,order,button) {
+  const previous = entry.previous ?? {status:entry.from};
+  if (!confirm(`Скасувати зміну «${entry.action}» та відновити статус «${previous.status}»?`)) return;
+  const updated = {...record,"Контингент":previous.status,manualStatus:true};
+  if (entry.previous) {
+    if (entry.leaveEnd) updated["Статус по"] = previous.leaveEnd;
+    if (entry.reason) updated[leaveFields[1]] = previous.reason;
+    if (entry.studyEnd) updated["Завершення навчання"] = previous.studyEnd;
+  }
+  updated.statusHistory = [...record.statusHistory,{action:"Зміну статусу скасовано",date:entry.date,
+    orderNumber:order.orderNumber,orderDate:order.orderDate,undoOf:index}];
+  button.disabled = true;
+  try { await saveHistoryEdit(record,updated); }
+  catch (error) { alert(sync.api?.errorText(error) ?? error.message); }
+  finally { button.disabled = false; }
 }
 
 function openCard(selected) {
@@ -776,13 +849,50 @@ function openCard(selected) {
     const movement = el("dd");
     movement.className = "statusHistory";
     const entries = el("ol");
-    entries.append(...[...history].reverse().map(entry => {
+    const corrections = new Map(), cancelled = new Set(), original = [];
+    history.forEach((entry,index) => {
+      if (Number.isInteger(entry.correctionOf)) {
+        const changes = corrections.get(entry.correctionOf) ?? [];
+        changes.push(entry);
+        corrections.set(entry.correctionOf,changes);
+      } else if (Number.isInteger(entry.undoOf)) cancelled.add(entry.undoOf);
+      else original.push({entry,index});
+    });
+    const latest = original.findLast(item => !cancelled.has(item.index))?.index;
+    entries.append(...original.reverse().map(({entry,index}) => {
       const item = el("li");
+      const changes = corrections.get(index) ?? [], order = changes.at(-1) ?? entry;
       item.append(el("strong",`${formatDate(entry.date)} · ${entry.action}`),
-        el("div",`Наказ № ${entry.orderNumber} від ${formatDate(entry.orderDate)}`));
+        el("div",`Наказ № ${order.orderNumber} від ${formatDate(order.orderDate)}`));
+      if (changes.length) {
+        const audit = el("details");
+        audit.append(el("summary","Попередні реквізити"),...[entry,...changes.slice(0,-1)].map(version =>
+          el("div",`Наказ № ${version.orderNumber} від ${formatDate(version.orderDate)}`)));
+        item.append(audit);
+      }
       if (entry.leaveEnd) item.append(el("div",`Відпустка до ${formatDate(entry.leaveEnd)}`));
       if (entry.reason) item.append(el("div",entry.reason));
       if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
+      if (cancelled.has(index)) {
+        const marker = el("strong","Скасовано");
+        marker.className = "cancelledStatus";
+        item.append(marker);
+      } else if (canEdit()) {
+        const actions = el("div"); actions.className = "statusHistoryActions";
+        const correct = el("button","Виправити реквізити");
+        correct.type = "button";
+        correct.onclick = () => correctOrder(record,index,order);
+        actions.append(correct);
+        const restorable = statuses.includes(entry.previous?.status ?? entry.from)
+          && (entry.previous || (!entry.leaveEnd && !entry.studyEnd));
+        if (index === latest && entry.to === currentStatus && restorable) {
+          const undo = el("button","Скасувати останню зміну");
+          undo.type = "button";
+          undo.onclick = () => undoStatus(record,index,entry,order,undo);
+          actions.append(undo);
+        }
+        item.append(actions);
+      }
       return item;
     }));
     movement.append(history.length ? entries : el("span","Записів про зміну статусу ще немає."));
@@ -802,7 +912,7 @@ function openCard(selected) {
     return button;
   }));
   select(selected);
-  $("card").showModal();
+  if (!$("card").open) $("card").showModal();
 }
 function setCards(next,reset = false) {
   cards = next.map(card => card["Джерело фінансування"] === "Проектна аспірантура"
@@ -870,6 +980,8 @@ function updateWriteControls() {
   $("changeStatus").hidden = !editable;
 }
 function clearSharedView() {
+  $("orderDialog").close();
+  $("orderForm").reset();
   $("statusDialog").close();
   $("statusForm").reset();
   $("card").close();
@@ -1048,6 +1160,10 @@ function setup() {
   $("closeCard").onclick = () => $("card").close();
   $("card").addEventListener("close",() => { $("details").parentElement.open = false; });
   $("cancelStatus").onclick = () => $("statusDialog").close();
+  $("closeOrder").onclick = () => $("orderDialog").close();
+  $("orderDialog").addEventListener("cancel",event => {
+    if ($("saveOrder").disabled) event.preventDefault();
+  });
   for (const name of ["registry","calendar"]) {
     $(name+"Tab").onclick = () => {
       for (const section of ["registry","calendar"]) {
