@@ -111,6 +111,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 @media(max-width:760px){#filterDialog{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:85dvh;border-radius:16px 16px 0 0}}
 .statusTools{margin:12px 0}.statusForm{display:grid;gap:10px}.statusForm label{font-size:13px;font-weight:650}.statusForm input,.statusForm select{font-size:16px}.statusFormActions{display:flex;gap:8px;justify-content:flex-end;margin-top:5px}
 .statusHistory ol{margin:0;padding-inline-start:18px}.statusHistory li{margin-bottom:8px;overflow-wrap:anywhere}
+.statusTools{display:flex;flex-wrap:wrap;gap:8px}
+.diplomaBlock{margin:12px 0;padding:12px 14px;border-radius:12px;background:#edf4ff}.diplomaBlock h3{margin:0}.diplomaBlock dl{margin:8px 0 0}
 .statusHistoryActions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.statusHistoryActions button{font-size:12px;padding:6px 8px}.cancelledStatus{color:#83291e}
 .statusActionGroup{min-width:0;margin:0;padding:0;border:0}.statusActionGroup legend{font-size:13px;font-weight:650}
 .statusActionGroup .filterChoices{display:grid;grid-template-columns:minmax(0,1fr)}.statusActionGroup .filterChoices button{text-align:left}
@@ -177,7 +179,10 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="profileHead"><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div><div class="profileActions"><button class="cardClose" id="closeCard">Закрити</button><div class="profileCardNumber"><span>№ картки</span><strong id="profileCardNumber"></strong></div></div></div>
 <div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
 <section class="deadlineBox" id="profileDeadline"></section>
-<div class="statusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button></div>
+<section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
+<h3 id="profileDiplomaTitle">Диплом доктора філософії</h3><dl id="profileDiplomaDetails"></dl>
+</section>
+<div class="statusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
@@ -201,6 +206,16 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Дата наказу<input id="correctOrderDate" type="date" required></label>
 <p id="orderError" role="alert" hidden></p>
 <div class="statusFormActions"><button type="button" id="closeOrder">Скасувати</button><button type="submit" id="saveOrder" class="primary">Зберегти зміни</button></div>
+</form>
+</dialog>
+<dialog id="diplomaDialog" aria-labelledby="diplomaTitle">
+<h2 id="diplomaTitle">Видати диплом</h2>
+<form id="diplomaForm" class="statusForm">
+<label>Серія диплома<input id="diplomaSeries" maxlength="40" required></label>
+<label>Номер диплома<input id="diplomaNumber" maxlength="80" required></label>
+<label>Дата видачі<input id="diplomaDate" type="date" required></label>
+<p id="diplomaError" role="alert" hidden></p>
+<div class="statusFormActions"><button type="button" id="cancelDiploma">Скасувати</button><button type="submit" id="saveDiploma" class="primary">Зберегти зміни</button></div>
 </form>
 </dialog>
 <dialog id="filterDialog" aria-labelledby="filterTitle">
@@ -773,13 +788,55 @@ function editStatus(record) {
   dialog.showModal();
 }
 
-async function saveHistoryEdit(record,updated) {
+async function saveHistoryEdit(record,updated,message = "Історію картки оновлено.") {
   if (!canEdit()) throw Error("Змінювати спільний реєстр може лише власник.");
   const latest = cards.find(card => card["ID картки"] === record["ID картки"]);
   if (JSON.stringify(latest) !== JSON.stringify(record)) throw Error("Цю картку вже оновлено. Відкрийте її з реєстру повторно.");
   const saved = await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
-  showNotice(saved ? "Історію картки оновлено." : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
+  showNotice(saved ? message : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
   if ($("card").open) openCard(updated);
+}
+function editDiploma(record) {
+  if (!canEdit()) return;
+  const dialog = $("diplomaDialog"), form = $("diplomaForm"), errorBox = $("diplomaError");
+  const series = $("diplomaSeries"), number = $("diplomaNumber"), date = $("diplomaDate");
+  const now = new Date();
+  const today = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $("diplomaTitle").textContent = record.diploma ? "Змінити реквізити диплома" : "Видати диплом";
+  series.value = record.diploma?.series ?? "";
+  number.value = record.diploma?.number ?? "";
+  date.value = record.diploma?.date ?? "";
+  date.max = today;
+  errorBox.hidden = true;
+  for (const field of [series,number]) {
+    field.setCustomValidity("");
+    field.oninput = () => field.setCustomValidity("");
+  }
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if ($("saveDiploma").disabled) return;
+    const diploma = {series:series.value.trim(),number:number.value.trim(),date:date.value};
+    for (const [field,value] of [[series,diploma.series],[number,diploma.number]]) {
+      field.setCustomValidity(value ? "" : "Заповніть це поле.");
+    }
+    if (!form.reportValidity()) return;
+    if (JSON.stringify(record.diploma) === JSON.stringify(diploma)) {
+      dialog.close();
+      return;
+    }
+    $("saveDiploma").disabled = $("cancelDiploma").disabled = true;
+    errorBox.hidden = true;
+    try {
+      await saveHistoryEdit(record,{...record,diploma},"Реквізити диплома збережено.");
+      dialog.close();
+    } catch (error) {
+      errorBox.textContent = sync.api?.errorText(error) ?? error.message;
+      errorBox.hidden = false;
+    } finally {
+      $("saveDiploma").disabled = $("cancelDiploma").disabled = false;
+    }
+  };
+  dialog.showModal();
 }
 function correctOrder(record,index,currentOrder) {
   const dialog = $("orderDialog"), form = $("orderForm"), errorBox = $("orderError");
@@ -877,6 +934,14 @@ function openCard(selected) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
     $("changeStatus").onclick = () => editStatus(record);
+    $("editDiploma").textContent = record.diploma ? "Змінити реквізити диплома" : "Видати диплом";
+    $("editDiploma").onclick = () => editDiploma(record);
+    $("profileDiploma").hidden = !record.diploma;
+    $("profileDiplomaDetails").replaceChildren(...(record.diploma ? [
+      el("dt","Серія диплома"),el("dd",record.diploma.series),
+      el("dt","Номер диплома"),el("dd",record.diploma.number),
+      el("dt","Дата видачі"),el("dd",formatDate(record.diploma.date))
+    ] : []));
     const history = record.statusHistory ?? [];
     const movement = el("dd");
     movement.className = "statusHistory";
@@ -1014,14 +1079,18 @@ function updateWriteControls() {
   $("pick").disabled = $("restore").disabled = !editable;
   $("export").disabled = $("backup").disabled = !editable || !cards.length;
   $("changeStatus").hidden = !editable;
+  $("editDiploma").hidden = !editable;
 }
 function clearSharedView() {
+  $("diplomaDialog").close();
+  $("diplomaForm").reset();
   $("orderDialog").close();
   $("orderForm").reset();
   $("statusDialog").close();
   $("statusForm").reset();
   $("card").close();
-  for (const id of ["person","profileLine","profileCardNumber","profileBadges","cardTabs","profileFacts","profileDeadline","details"]) $(id).replaceChildren();
+  for (const id of ["person","profileLine","profileCardNumber","profileBadges","cardTabs","profileFacts","profileDeadline","profileDiplomaDetails","details"]) $(id).replaceChildren();
+  $("profileDiploma").hidden = true;
   $("search").value = "";
   selectedMetric = null;
   setCards([],true);
@@ -1107,6 +1176,10 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
   for (const card of incoming) {
     const key = card["ID картки"], old = merged.get(key);
     if (old && old["ID ФО"] !== card["ID ФО"]) throw new Error("Ідентифікатор картки вже належить іншій особі.");
+    if (protectHistory && old?.diploma && card.diploma && JSON.stringify(old.diploma) !== JSON.stringify(card.diploma)) {
+      throw Error("Копія містить інші реквізити диплома. Спільний реєстр залишено без змін.");
+    }
+    const incomingCard = old?.diploma && !card.diploma ? {...card,diploma:old.diploma} : card;
     if (protectHistory && old?.manualStatus) {
       const before = old.statusHistory ?? [], after = card.statusHistory ?? [];
       if (before.some((entry,index) => JSON.stringify(entry) !== JSON.stringify(after[index]))
@@ -1116,13 +1189,13 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
     }
     if (preserveManual && old?.manualStatus) {
       const history = old.statusHistory ?? [];
-      const updated = {...card,"Контингент":old["Контингент"],manualStatus:true};
+      const updated = {...incomingCard,"Контингент":old["Контингент"],manualStatus:true};
       if (history.length) updated.statusHistory = history;
       if (history.some(entry => entry.leaveEnd)) for (const field of leaveFields) updated[field] = old[field];
       if (history.some(entry => entry.studyEnd)) updated["Завершення навчання"] = old["Завершення навчання"];
       if (history.some(entry => Number.isInteger(entry.courseTo))) updated["Курс"] = old["Курс"];
       merged.set(key,updated);
-    } else merged.set(key,card);
+    } else merged.set(key,incomingCard);
   }
   return [...merged.values()];
 }
@@ -1149,6 +1222,8 @@ function decodeBackup(data) {
     || !["ID картки","ID ФО"].every(field => Number.isSafeInteger(card[field]) && card[field] > 0)
     || (card.statusHistory != null && (!Array.isArray(card.statusHistory) || card.statusHistory.some(entry =>
       !entry || !["action","date","orderDate","orderNumber"].every(field => typeof entry[field] === "string"))))
+    || (card.diploma != null && (!["series","number"].every(field => typeof card.diploma[field] === "string" && card.diploma[field].trim())
+      || typeof card.diploma.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(card.diploma.date)))
     || [...dateFields].some(field => card[field] != null &&
       (typeof card[field] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(card[field]))))) {
     throw new Error("Цей файл не є копією реєстру «Аспіранти НУБіП України».");
@@ -1198,6 +1273,10 @@ function setup() {
   $("card").addEventListener("close",() => { $("details").parentElement.open = false; });
   $("cancelStatus").onclick = () => $("statusDialog").close();
   $("closeOrder").onclick = () => $("orderDialog").close();
+  $("cancelDiploma").onclick = () => $("diplomaDialog").close();
+  $("diplomaDialog").addEventListener("cancel",event => {
+    if ($("saveDiploma").disabled) event.preventDefault();
+  });
   $("orderDialog").addEventListener("cancel",event => {
     if ($("saveOrder").disabled) event.preventDefault();
   });
