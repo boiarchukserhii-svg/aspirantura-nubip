@@ -119,7 +119,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .profileCardNumber{display:grid;gap:2px;min-width:0;padding:6px 8px;border-radius:9px;background:#edf4ff;color:#174d91;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:center}
 .profileCardNumber strong{font-size:13px}
 #person .nameLine{display:block}
-#changeStatus,.profileMore>summary{width:min(100%,180px);min-height:41px}
+#changeStatus,#editDiploma,.profileMore>summary{width:min(100%,180px);min-height:41px}
+@media(max-width:760px){.statusTools{flex-wrap:nowrap}#changeStatus,#editDiploma{flex:1;min-width:0;width:auto}}
 .profileMore>summary{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 13px;border-radius:8px;background:#dceaff;color:#15447f;font-weight:650;cursor:pointer}
 .profileMore>summary::after{content:"+"}.profileMore[open]>summary::after{content:"−"}
 .profileMore>summary:hover{background:#ccdef7}
