@@ -675,7 +675,7 @@ function shortCardRow(record) {
     if (field === "Здобувач") {
       cell.append(nameButton(record));
     } else if (field === "Контингент") {
-      const badge = el("span",display(record,field));
+      const badge = el("span",record[field] === COMPLETED ? "Завершено навчання" : display(record,field));
       badge.className = "registryStatus "+["active","leave","done","dismissed"][statuses.indexOf(record[field])];
       cell.append(badge);
     } else {
