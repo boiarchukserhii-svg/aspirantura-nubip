@@ -193,8 +193,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section id="archive" class="calendarSection" aria-label="Архів" hidden>
 <div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openArchiveFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="archiveFilterCount"></span></button></div>
 <div class="activeFilters" id="archiveActiveFilters" aria-label="Активні фільтри архіву" hidden></div>
-<div class="archiveCategories" id="archiveCategories"><button id="archiveCompleted" type="button" aria-pressed="true" aria-controls="archiveContent">Завершили навчання</button><button id="archiveDismissed" type="button" aria-pressed="false" aria-controls="archiveContent">Відраховані</button>
-<div id="archiveContent">
+<div class="archiveCategories" id="archiveCategories"><button id="archiveCompleted" type="button" aria-expanded="false" aria-controls="archiveContent">Завершили навчання</button><button id="archiveDismissed" type="button" aria-expanded="false" aria-controls="archiveContent">Відраховані</button>
+<div id="archiveContent" hidden>
 <p id="archiveEmpty" role="status" hidden></p>
 <div class="archiveCardList"><table><thead id="archiveHead"></thead><tbody id="archiveCards"></tbody></table></div>
 </div>
@@ -705,17 +705,11 @@ function renderArchive() {
   for (const [id,status] of archiveCategories) {
     const button = $(id), selected = status === archiveStatus;
     button.hidden = Boolean(query);
-    if (mobile) {
-      button.removeAttribute("aria-pressed");
-      button.setAttribute("aria-expanded",String(selected && archiveExpanded));
-      if (selected && button.nextElementSibling !== content) button.after(content);
-    } else {
-      button.removeAttribute("aria-expanded");
-      button.setAttribute("aria-pressed",String(selected));
-    }
+    button.setAttribute("aria-expanded",String(selected && archiveExpanded));
+    if (mobile && selected && button.nextElementSibling !== content) button.after(content);
   }
   if (!mobile && content !== $("archiveCategories").lastElementChild) $("archiveCategories").append(content);
-  content.hidden = mobile && !archiveExpanded && !query;
+  content.hidden = !archiveExpanded && !query;
   renderActiveFilters(true);
   if (content.hidden) return;
   const matches = sectionCards(true,Boolean(query)).filter(card =>
