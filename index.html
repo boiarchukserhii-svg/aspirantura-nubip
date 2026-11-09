@@ -140,11 +140,11 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 @media(max-width:430px){.profileHead{gap:8px}.profileCardNumber{padding-inline:6px}}
 .calendarSections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px;margin-top:12px}
 .calendarSection{min-width:0}
-.calendarSection>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:46px;padding:10px 14px;border-radius:9px;background:#e9f1fc;color:#174d91;font-size:15px;font-weight:700;cursor:pointer}
-.calendarSection>summary:hover{background:#dceaff}
-.calendarSection>summary::after{content:"+";font-size:19px;line-height:1}
+.calendarSection>summary,.archiveCategories button[aria-expanded]{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:46px;padding:10px 14px;border-radius:9px;background:#e9f1fc;color:#174d91;font-size:15px;font-weight:700;cursor:pointer}
+.calendarSection>summary:hover,.archiveCategories button[aria-expanded]:hover{background:#dceaff}
+.calendarSection>summary::after,.archiveCategories button[aria-expanded]::after{content:"+";font-size:19px;line-height:1}
 .calendarSection[open]>summary{margin-bottom:8px}
-.calendarSection[open]>summary::after{content:"−"}
+.calendarSection[open]>summary::after,.archiveCategories button[aria-expanded=true]::after{content:"−"}
 #calendar .calendarSection tbody{grid-template-columns:minmax(0,1fr)}
 .calendarSection p{margin:8px 0;color:#405571}
 @media(max-width:760px){.calendarSections{grid-template-columns:minmax(0,1fr);gap:8px}}
@@ -152,6 +152,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 #archive .registryStatus{background:#ffe5e1;color:#83291e}
 .archiveCategories{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .archiveCategories button{padding-inline:6px;min-height:44px;white-space:nowrap;font-size:clamp(12px,3.5vw,15px)}
+#archiveContent{grid-column:1/-1;min-width:0;margin-top:8px}
+@media(max-width:760px){.archiveCategories{grid-template-columns:minmax(0,1fr);gap:8px}.archiveCategories button[aria-expanded]{padding-inline:14px;font-size:15px}#archiveContent{margin-top:0}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -188,11 +190,14 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 </div>
 </div>
 <section id="archive" class="calendarSection" aria-label="Архів" hidden>
-<div class="toolbar archiveCategories" role="group" aria-label="Категорії архіву"><button id="archiveCompleted" type="button" aria-pressed="true">Завершили навчання</button><button id="archiveDismissed" type="button" aria-pressed="false">Відраховані</button></div>
+<div class="archiveCategories" id="archiveCategories"><button id="archiveCompleted" type="button" aria-pressed="true" aria-controls="archiveContent">Завершили навчання</button><button id="archiveDismissed" type="button" aria-pressed="false" aria-controls="archiveContent">Відраховані</button>
+<div id="archiveContent">
 <div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openArchiveFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="archiveFilterCount"></span></button></div>
 <div class="activeFilters" id="archiveActiveFilters" aria-label="Активні фільтри архіву" hidden></div>
 <p id="archiveEmpty" role="status" hidden></p>
 <div class="archiveCardList"><table><thead id="archiveHead"></thead><tbody id="archiveCards"></tbody></table></div>
+</div>
+</div>
 </section>
 </section>
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
@@ -687,13 +692,28 @@ function shortCardRow(record) {
   return row;
 }
 const archiveCategories = [["archiveCompleted",COMPLETED],["archiveDismissed",DISMISSED]];
+const mobileLayout = matchMedia("(max-width:760px)");
 let archiveStatus = COMPLETED;
+let archiveExpanded = false;
 function renderArchive() {
+  const mobile = mobileLayout.matches;
+  const content = $("archiveContent");
+  for (const [id,status] of archiveCategories) {
+    const button = $(id), selected = status === archiveStatus;
+    if (mobile) {
+      button.removeAttribute("aria-pressed");
+      button.setAttribute("aria-expanded",String(selected && archiveExpanded));
+      if (selected && button.nextElementSibling !== content) button.after(content);
+    } else {
+      button.removeAttribute("aria-expanded");
+      button.setAttribute("aria-pressed",String(selected));
+    }
+  }
+  if (!mobile && content !== $("archiveCategories").lastElementChild) $("archiveCategories").append(content);
+  content.hidden = mobile && !archiveExpanded;
+  if (content.hidden) return;
   renderActiveFilters(true);
   const query = $("archiveSearch").value.trim().toLocaleLowerCase("uk");
-  for (const [id,status] of archiveCategories) {
-    $(id).setAttribute("aria-pressed",String(status === archiveStatus));
-  }
   const matches = sectionCards(true).filter(card =>
     String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
     && [...archiveFilters].every(([field,value]) => value === String(display(card,field))));
@@ -1413,12 +1433,15 @@ function setup() {
   $("newCardDialog").addEventListener("cancel",event => {
     if ($("saveNewCard").disabled) event.preventDefault();
   });
-  const mobile = matchMedia("(max-width:760px)");
+  const mobile = mobileLayout;
   const setFilterVisibility = () => {
     $("registryList").open = !mobile.matches;
   };
   setFilterVisibility();
   mobile.addEventListener("change",setFilterVisibility);
+  mobile.addEventListener("change",() => {
+    if (!$("archive").hidden) renderArchive();
+  });
   for (const [id,archive] of [["openFilters",false],["openArchiveFilters",true]]) {
     $(id).onclick = () => {
       editingArchiveFilters = archive;
@@ -1472,6 +1495,7 @@ function setup() {
   });
   for (const [id,status] of archiveCategories) {
     $(id).onclick = () => {
+      archiveExpanded = status !== archiveStatus || !archiveExpanded;
       archiveStatus = status;
       pruneFilters(archiveFilters,true);
       renderArchive();
