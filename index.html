@@ -145,11 +145,14 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 #registryList>summary::-webkit-details-marker,.calendarSection>summary::-webkit-details-marker{display:none}
 #registryList>summary::before,.calendarSection>summary::before,.archiveCategories>button[aria-expanded]::before{content:"▸";font-size:20px;line-height:1}
 .calendarSection[open]>summary{margin-bottom:8px}
-#registryList[open]>summary::before,.calendarSection[open]>summary::before,.archiveCategories>button[aria-expanded=true]::before{content:"▾"}
+#registryList[open]>summary::before,.calendarSection[open]>summary::before{content:"▾"}
+.archiveCategories>button[aria-expanded]::before{flex:0 0 20px;text-align:center}
+.archiveCategories>button[aria-expanded=true]::before{transform:rotate(90deg)}
 #calendar .calendarSection tbody{grid-template-columns:minmax(0,1fr)}
 .calendarSection p{margin:8px 0;color:#405571}
 @media(max-width:760px){.calendarSections{grid-template-columns:minmax(0,1fr);gap:8px}}
 .archiveCardList{margin-top:14px}
+@media(min-width:761px){.archiveCardList{max-height:52vh;overflow:auto;scrollbar-gutter:stable}}
 #archive .registryStatus{background:#ffe5e1;color:#83291e}
 .archiveCategories{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
 .archiveCategories>button{padding-inline:6px;min-height:44px;white-space:nowrap;font-size:clamp(12px,3.5vw,15px)}
@@ -196,7 +199,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="archiveCategories" id="archiveCategories"><button id="archiveCompleted" type="button" aria-expanded="false" aria-controls="archiveContent">Завершили навчання</button><button id="archiveDismissed" type="button" aria-expanded="false" aria-controls="archiveContent">Відраховані</button>
 <div id="archiveContent" hidden>
 <p id="archiveEmpty" role="status" hidden></p>
-<div class="archiveCardList"><table><thead id="archiveHead"></thead><tbody id="archiveCards"></tbody></table></div>
+<div class="archiveCardList" id="archiveCardList"><table><thead id="archiveHead"></thead><tbody id="archiveCards"></tbody></table></div>
 </div>
 </div>
 </section>
@@ -719,6 +722,7 @@ function renderArchive() {
   $("archiveEmpty").hidden = Boolean(matches.length);
   $("archiveEmpty").textContent = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
   $("archiveCards").replaceChildren(...matches.map(shortCardRow));
+  $("archiveCardList").scrollTop = 0;
 }
 function renderRegistry() {
   renderActiveFilters();
