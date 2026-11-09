@@ -229,7 +229,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
 <h3 id="profileDiplomaTitle">Диплом доктора філософії</h3><dl id="profileDiplomaDetails"></dl>
 </section>
-<div class="statusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
+<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
@@ -835,7 +835,7 @@ function renderCalendar() {
   $("emptyStudyCalendar").hidden = Boolean(studyRows.length);
 }
 function editStatus(record) {
-  if (!canEdit()) return;
+  if (!canEdit() || record.diploma) return;
   const dialog = $("statusDialog"), form = $("statusForm");
   const current = record["Контингент"];
   const course = Number(record["Курс"]);
@@ -953,10 +953,9 @@ async function saveHistoryEdit(record,updated,message = "Історію карт
   showNotice(saved ? message : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
   if ($("card").open) openCard(updated);
 }
-let diplomaActionAvailable = false;
+let selectedProfile = null;
 function canEditDiploma(record) {
-  const status = record["Контингент"];
-  return status !== DISMISSED && (status !== COMPLETED || Boolean(record.diploma));
+  return !record.diploma && [ACTIVE,LEAVE].includes(record["Контингент"]);
 }
 function editDiploma(record) {
   if (!canEdit() || !canEditDiploma(record)) return;
@@ -964,7 +963,7 @@ function editDiploma(record) {
   const series = $("diplomaSeries"), number = $("diplomaNumber"), date = $("diplomaDate");
   const now = new Date();
   const today = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  $("diplomaTitle").textContent = record.diploma ? "Змінити реквізити диплома" : "Видати диплом";
+  $("diplomaTitle").textContent = "Видати диплом";
   series.value = record.diploma?.series ?? "";
   number.value = record.diploma?.number ?? "";
   date.value = record.diploma?.date ?? "";
@@ -1099,9 +1098,8 @@ function openCard(selected) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
     $("changeStatus").onclick = () => editStatus(record);
-    diplomaActionAvailable = canEditDiploma(record);
-    $("editDiploma").hidden = !canEdit() || !diplomaActionAvailable;
-    $("editDiploma").textContent = record.diploma ? "Змінити реквізити диплома" : "Видати диплом";
+    selectedProfile = record;
+    updateProfileActions();
     $("editDiploma").onclick = () => editDiploma(record);
     $("profileDiploma").hidden = !record.diploma;
     $("profileDiplomaDetails").replaceChildren(...(record.diploma ? [
@@ -1299,16 +1297,20 @@ function updateSyncControls(message) {
   $("syncTransfer").disabled = sync.busy || !sync.ready;
   updateWriteControls();
 }
+function updateProfileActions() {
+  const show = canEdit() && selectedProfile !== null && !selectedProfile.diploma;
+  $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
+  $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
+}
 function updateWriteControls() {
   const editable = canEdit();
   $("pick").disabled = $("restore").disabled = !editable;
   $("export").disabled = $("backup").disabled = !editable || !cards.length;
-  $("changeStatus").hidden = !editable;
-  $("editDiploma").hidden = !editable || !diplomaActionAvailable;
+  updateProfileActions();
   $("addCard").hidden = !editable;
 }
 function clearSharedView() {
-  diplomaActionAvailable = false;
+  selectedProfile = null;
   $("newCardDialog").close();
   $("newCardForm").reset();
   $("diplomaDialog").close();
