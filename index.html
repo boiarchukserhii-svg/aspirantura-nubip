@@ -1159,11 +1159,11 @@ function openCard(selected) {
       }
       return item;
     }));
-    movement.append(history.length ? entries : el("span","Записів про зміну статусу ще немає."));
+    movement.append(history.length ? entries : el("span","Записів про зміну статусу ще немає"));
     const extraFields = [["Дата народження","Дата народження"],["ID ОП","ID ОНП"],
       ["Статус навчання","Статус у ЄДЕБО"]];
-    $("details").replaceChildren(...extraFields.flatMap(([field,label]) => [el("dt",label),el("dd",display(record,field))]),
-      el("dt","Зміни статусу"),movement);
+    $("details").replaceChildren(...extraFields.flatMap(([field,label]) => [el("dt",label),el("dd",display(record,field))]));
+    if (history.length || !record.diploma) $("details").append(el("dt","Зміни статусу"),movement);
     if (isLeave && record[leaveFields[1]] && !history.some(entry => entry.reason === record[leaveFields[1]])) {
       $("details").append(el("dt","Підстава академвідпустки"),el("dd",display(record,leaveFields[1])));
     }
