@@ -18,8 +18,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;padding:13px}
   header h1{font-size:clamp(17px,4.7vw,26px);line-height:1.15;gap:7px}
   header .primary{padding:7px 10px}
-  .panel{padding:10px}.mainNav{display:grid;grid-template-columns:1fr 1.65fr 1fr;gap:4px}
-  .mainNav button{font-size:clamp(11px,3.2vw,14px);padding:9px 2px}
+  .panel{padding:10px}.mainNav{display:grid;grid-template-columns:auto minmax(max-content,1.65fr) auto auto;gap:4px}
+  .mainNav button{font-size:clamp(11px,3.1vw,14px);padding:9px 2px;min-height:44px}
   .registryTools summary{display:list-item;cursor:pointer;color:#174d91;font-weight:650;padding:6px 0}
   #registry .scroll,#calendar .scroll{overflow:visible;max-height:none}
 }
@@ -148,6 +148,11 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 #calendar .calendarSection tbody{grid-template-columns:minmax(0,1fr)}
 .calendarSection p{margin:8px 0;color:#405571}
 @media(max-width:760px){.calendarSections{grid-template-columns:minmax(0,1fr);gap:8px}}
+.archiveCards{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0 0;padding:0}
+.archiveCards li{display:grid;gap:4px;padding:10px 12px;border:1px solid #dce6f1;border-radius:12px;background:#f8fbff;overflow-wrap:anywhere}
+.archiveCards button{padding:4px 0;background:none;text-align:left}
+.archiveCards span{font-size:13px}
+@media(max-width:760px){.archiveCards{grid-template-columns:minmax(0,1fr)}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -160,7 +165,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 
 </section>
 <section class="panel">
-<nav class="toolbar mainNav" aria-label="Розділи"><button id="registryTab" aria-pressed="true">Реєстр</button><button id="calendarTab" aria-pressed="false">Календар строків</button><button id="export" title="Експорт реєстру у CSV для Excel">Експорт</button></nav>
+<nav class="toolbar mainNav" aria-label="Розділи"><button id="registryTab" aria-pressed="true">Реєстр</button><button id="calendarTab" aria-pressed="false">Календар строків</button><button id="archiveTab" aria-pressed="false">Архів</button><button id="export" title="Експорт реєстру у CSV для Excel">Експорт</button></nav>
 <div class="toolbar" id="installation" hidden><button id="install">Встановити застосунок</button><span id="installHelp" hidden></span></div>
 <div id="registry">
 <div class="metricSelection" id="metricSelection" hidden><strong id="metricSelectionLabel"></strong><button id="clearMetric">Показати всі картки</button></div>
@@ -183,6 +188,12 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 </details>
 </div>
 </div>
+<section id="archive" class="calendarSection" aria-label="Архів" hidden>
+<div class="toolbar" role="group" aria-label="Категорії архіву"><button id="archiveCompleted" type="button" aria-pressed="true">Завершили навчання</button><button id="archiveDismissed" type="button" aria-pressed="false">Відраховані</button></div>
+<label>Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label>
+<p id="archiveEmpty" role="status" hidden></p>
+<ul id="archiveCards" class="archiveCards"></ul>
+</section>
 </section>
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
 <footer class="siteFooter"><span class="footerBlock">© Сергій БОЯРЧУК, 2026</span><a class="footerBlock" href="https://nubip.edu.ua/department/viddil-aspirantury-doktorantury-ta-atestatsiyi-naukovykh-kadriv">Відділ аспірантури, докторантури та атестації наукових кадрів</a></footer>
@@ -632,6 +643,27 @@ function nameButton(record) {
   button.onclick = () => openCard(record);
   return button;
 }
+const archiveCategories = [["archiveCompleted",COMPLETED,"Завершили навчання"],["archiveDismissed",DISMISSED,"Відраховані"]];
+let archiveStatus = COMPLETED;
+function renderArchive() {
+  const query = $("archiveSearch").value.trim().toLocaleLowerCase("uk");
+  let matches = [];
+  for (const [id,status,label] of archiveCategories) {
+    const records = cards.filter(card => card["Контингент"] === status);
+    $(id).textContent = `${label} · ${count(records.length)}`;
+    $(id).setAttribute("aria-pressed",String(status === archiveStatus));
+    if (status === archiveStatus) matches = records.filter(card =>
+      String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query));
+  }
+  matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
+  $("archiveEmpty").hidden = Boolean(matches.length);
+  $("archiveEmpty").textContent = query ? "За цим запитом карток немає." : "У цій категорії поки немає карток.";
+  $("archiveCards").replaceChildren(...matches.map(record => {
+    const item = el("li");
+    item.append(nameButton(record),el("span",display(record,"Освітня програма")));
+    return item;
+  }));
+}
 function renderRegistry() {
   renderActiveFilters();
   const query = $("search").value.trim().toLocaleLowerCase("uk");
@@ -943,7 +975,9 @@ async function undoStatus(record,index,entry,order,button) {
 }
 
 function openCard(selected) {
-  const related = cards.filter(card => card["ID ФО"] === selected["ID ФО"]);
+  const isArchived = card => [COMPLETED,DISMISSED].includes(card["Контингент"]);
+  const related = cards.filter(card => card["ID ФО"] === selected["ID ФО"])
+    .sort((a,b) => Number(isArchived(a))-Number(isArchived(b)));
   function select(record) {
     const currentStatus = record["Контингент"];
     const parts = String(display(record,"Здобувач")).trim().split(/\s+/);
@@ -1054,7 +1088,9 @@ function openCard(selected) {
     for (const button of $("cardTabs").children) button.setAttribute("aria-pressed",button.dataset.key === String(record["ID картки"]));
   }
   $("cardTabs").replaceChildren(...(related.length > 1 ? related : []).map((record,index) => {
-    const button = el("button","Картка "+(index+1));
+    const status = record["Контингент"] === COMPLETED ? "Завершення навчання"
+      : record["Контингент"] === DISMISSED ? "Відрахування" : record["Контингент"];
+    const button = el("button",`Картка ${index+1} · ${status}`);
     button.dataset.key = record["ID картки"];
     button.onclick = () => select(record);
     return button;
@@ -1119,8 +1155,10 @@ function setCards(next,reset = false) {
   if (reset) filters.clear();
   else pruneFilters(filters);
   if (reset) $("search").value = "";
+  if (reset) $("archiveSearch").value = "";
   updateWriteControls();
   renderMetrics(); renderRegistry(); renderCalendar();
+  if (!$("archive").hidden) renderArchive();
 }
 async function saveCards(next,transfer = false) {
   if (sync.uid) {
@@ -1389,12 +1427,21 @@ function setup() {
   $("orderDialog").addEventListener("cancel",event => {
     if ($("saveOrder").disabled) event.preventDefault();
   });
-  for (const name of ["registry","calendar"]) {
+  for (const [id,status] of archiveCategories) {
+    $(id).onclick = () => {
+      archiveStatus = status;
+      renderArchive();
+    };
+  }
+  $("archiveSearch").oninput = renderArchive;
+  const sections = ["registry","calendar","archive"];
+  for (const name of sections) {
     $(name+"Tab").onclick = () => {
-      for (const section of ["registry","calendar"]) {
+      for (const section of sections) {
         $(section).hidden = section !== name;
         $(section+"Tab").setAttribute("aria-pressed",section === name);
       }
+      if (name === "archive") renderArchive();
     };
   }
   $("pick").onclick = () => $("files").click();
