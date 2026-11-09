@@ -154,6 +154,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .archiveCardList{margin-top:14px}
 @media(min-width:761px){.archiveCardList{max-height:52vh;overflow:auto;scrollbar-gutter:stable}}
 #archive .registryStatus{background:#ffe5e1;color:#83291e}
+#archive .registryStatus.done.hasDiploma,.profileBadges .done.hasDiploma{background:#dcf4e4;color:#21643d}
 .archiveCategories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:12px}
 .archiveCategories>button{padding-inline:6px;min-height:44px;white-space:nowrap;font-size:clamp(12px,3.5vw,15px)}
 #archiveContent{grid-column:1/-1;min-width:0;margin-top:8px}
@@ -703,6 +704,7 @@ function shortCardRow(record) {
     } else if (field === "Контингент") {
       const badge = el("span",record[field] === COMPLETED ? "Завершено навчання" : display(record,field));
       badge.className = "registryStatus "+["active","leave","done","dismissed"][statuses.indexOf(record[field])];
+      if (record[field] === COMPLETED && record.diploma) badge.classList.add("hasDiploma");
       cell.append(badge);
     } else {
       cell.textContent = display(record,field);
@@ -1069,6 +1071,7 @@ function openCard(selected) {
     $("profileLine").textContent = "Доктор філософії · "+display(record,"Курс")+"-й рік навчання";
     const badge = el("span",currentStatus), form = el("span",display(record,"Форма навчання"));
     badge.className = "pill "+["active","leave","done","dismissed"][statuses.indexOf(currentStatus)];
+    if (currentStatus === COMPLETED && record.diploma) badge.classList.add("hasDiploma");
     form.className = "pill";
     const funding = el("span",display(record,"Джерело фінансування"));
     funding.className = "pill";
