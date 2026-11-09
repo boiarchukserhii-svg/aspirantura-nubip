@@ -152,6 +152,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .archiveCards li{display:grid;gap:4px;padding:10px 12px;border:1px solid #dce6f1;border-radius:12px;background:#f8fbff;overflow-wrap:anywhere}
 .archiveCards button{padding:4px 0;background:none;text-align:left}
 .archiveCards span{font-size:13px}
+.archiveCategories{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.archiveCategories button{padding-inline:6px;min-height:44px;white-space:nowrap;font-size:clamp(12px,3.5vw,15px)}
 @media(max-width:760px){.archiveCards{grid-template-columns:minmax(0,1fr)}}
 </style>
 <main>
@@ -189,8 +191,9 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 </div>
 </div>
 <section id="archive" class="calendarSection" aria-label="Архів" hidden>
-<div class="toolbar" role="group" aria-label="Категорії архіву"><button id="archiveCompleted" type="button" aria-pressed="true">Завершили навчання</button><button id="archiveDismissed" type="button" aria-pressed="false">Відраховані</button></div>
-<label>Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label>
+<div class="toolbar archiveCategories" role="group" aria-label="Категорії архіву"><button id="archiveCompleted" type="button" aria-pressed="true">Завершили навчання</button><button id="archiveDismissed" type="button" aria-pressed="false">Відраховані</button></div>
+<div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openArchiveFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="archiveFilterCount"></span></button></div>
+<div class="activeFilters" id="archiveActiveFilters" aria-label="Активні фільтри архіву" hidden></div>
 <p id="archiveEmpty" role="status" hidden></p>
 <ul id="archiveCards" class="archiveCards"></ul>
 </section>
@@ -527,28 +530,34 @@ let cards = [], selectedMetric = null;
 let metricGroups = [];
 const expandedCourses = new Map([[0,new Set()],[2,new Set()]]);
 const filters = new Map();
+const archiveFilters = new Map();
 let draftFilters = new Map();
+let editingArchiveFilters = false;
 const searchableFilters = new Set(["Структурний підрозділ","Спеціальність","Освітня програма"]);
 const filterLabel = field => field === "Статус навчання" ? "Статус у ЄДЕБО" : field;
 const filterValue = (field,value) => field === "Курс" ? `${value} курс` : value;
 
-function filterOptions(field,selection) {
-  if (field === "Контингент") return statuses;
+function sectionCards(archive) {
+  return cards.filter(card => archive ? card["Контингент"] === archiveStatus : [ACTIVE,LEAVE].includes(card["Контингент"]));
+}
+function filterOptions(field,selection,archive) {
+  if (field === "Контингент") return [ACTIVE,LEAVE];
   const dependencies = field === "Освітня програма" ? ["Структурний підрозділ","Спеціальність"]
     : field === "Спеціальність" ? ["Структурний підрозділ"] : [];
-  const eligible = cards.filter(card => dependencies.every(key => !selection.has(key)
+  const eligible = sectionCards(archive).filter(card => dependencies.every(key => !selection.has(key)
     || String(display(card,key)) === selection.get(key)));
   return [...new Set(eligible.map(card => String(display(card,field))))].sort(collator.compare);
 }
-function pruneFilters(selection) {
+function pruneFilters(selection,archive = false) {
   for (const field of filterFields) {
-    if (selection.has(field) && !filterOptions(field,selection).includes(selection.get(field))) selection.delete(field);
+    if (selection.has(field) && !filterOptions(field,selection,archive).includes(selection.get(field))) selection.delete(field);
   }
 }
 function renderFilterPanel() {
   const container = $("filters");
   const expanded = new Set([...container.children].filter(group => group.open).map(group => group.dataset.field));
-  container.replaceChildren(...filterFields.map((field,index) => {
+  const availableFields = editingArchiveFilters ? filterFields.filter(field => field !== "Контингент") : filterFields;
+  container.replaceChildren(...availableFields.map((field,index) => {
     const group = el("details"), choices = el("div");
     group.className = "filterGroup";
     group.dataset.field = field;
@@ -557,14 +566,14 @@ function renderFilterPanel() {
     group.append(el("summary",filterLabel(field)+(current ? " · "+filterValue(field,current) : "")));
     choices.className = searchableFilters.has(field) ? "filterChoices longChoices" : "filterChoices";
     function renderChoices(query = "") {
-      const options = filterOptions(field,draftFilters).filter(value => value.toLocaleLowerCase("uk").includes(query));
+      const options = filterOptions(field,draftFilters,editingArchiveFilters).filter(value => value.toLocaleLowerCase("uk").includes(query));
       choices.replaceChildren(...["",...options].map(value => {
         const button = el("button",value ? filterValue(field,value) : "Усі");
         button.type = "button";
         button.setAttribute("aria-pressed",String((draftFilters.get(field) ?? "") === value));
         button.onclick = () => {
           if (value) draftFilters.set(field,value); else draftFilters.delete(field);
-          pruneFilters(draftFilters);
+          pruneFilters(draftFilters,editingArchiveFilters);
           renderFilterPanel();
           const updated = [...container.children].find(item => item.dataset.field === field);
           updated.querySelector('button[aria-pressed="true"]')?.focus();
@@ -585,18 +594,20 @@ function renderFilterPanel() {
     return group;
   }));
 }
-function renderActiveFilters() {
-  $("activeFilterCount").textContent = filters.size ? ` · ${filters.size}` : "";
-  $("activeFilters").hidden = !filters.size;
-  $("activeFilters").replaceChildren(...[...filters].map(([field,value]) => {
+function renderActiveFilters(archive = false) {
+  const selection = archive ? archiveFilters : filters;
+  const container = $(archive ? "archiveActiveFilters" : "activeFilters");
+  $(archive ? "archiveFilterCount" : "activeFilterCount").textContent = selection.size ? ` · ${selection.size}` : "";
+  container.hidden = !selection.size;
+  container.replaceChildren(...[...selection].map(([field,value]) => {
     const button = el("button",filterValue(field,value)+" ×");
     button.type = "button";
     button.setAttribute("aria-label","Прибрати фільтр «"+filterLabel(field)+"»");
     button.onclick = () => {
-      filters.delete(field);
-      pruneFilters(filters);
-      renderRegistry();
-      $("openFilters").focus();
+      selection.delete(field);
+      pruneFilters(selection,archive);
+      if (archive) renderArchive(); else renderRegistry();
+      $(archive ? "openArchiveFilters" : "openFilters").focus();
     };
     return button;
   }));
@@ -661,21 +672,20 @@ function nameButton(record) {
   button.onclick = () => openCard(record);
   return button;
 }
-const archiveCategories = [["archiveCompleted",COMPLETED,"Завершили навчання"],["archiveDismissed",DISMISSED,"Відраховані"]];
+const archiveCategories = [["archiveCompleted",COMPLETED],["archiveDismissed",DISMISSED]];
 let archiveStatus = COMPLETED;
 function renderArchive() {
+  renderActiveFilters(true);
   const query = $("archiveSearch").value.trim().toLocaleLowerCase("uk");
-  let matches = [];
-  for (const [id,status,label] of archiveCategories) {
-    const records = cards.filter(card => card["Контингент"] === status);
-    $(id).textContent = `${label} · ${count(records.length)}`;
+  for (const [id,status] of archiveCategories) {
     $(id).setAttribute("aria-pressed",String(status === archiveStatus));
-    if (status === archiveStatus) matches = records.filter(card =>
-      String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query));
   }
+  const matches = sectionCards(true).filter(card =>
+    String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
+    && [...archiveFilters].every(([field,value]) => value === String(display(card,field))));
   matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
   $("archiveEmpty").hidden = Boolean(matches.length);
-  $("archiveEmpty").textContent = query ? "За цим запитом карток немає." : "У цій категорії поки немає карток.";
+  $("archiveEmpty").textContent = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
   $("archiveCards").replaceChildren(...matches.map(record => {
     const item = el("li");
     item.append(nameButton(record),el("span",display(record,"Освітня програма")));
@@ -689,7 +699,7 @@ function renderRegistry() {
   $("metricSelection").hidden = !group;
   $("metricSelectionLabel").textContent = group?.label ?? "";
   [...$("metrics").children].forEach((button,index) => button.setAttribute("aria-pressed",String(index === selectedMetric)));
-  const matches = cards.filter(card => (!group || group.ids.has(card["ID картки"]))
+  const matches = sectionCards(false).filter(card => (!group || group.ids.has(card["ID картки"]))
     && String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
     && [...filters].every(([field,value]) => value === String(display(card,field))));
   const compareNames = (a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач"));
@@ -1174,6 +1184,8 @@ function setCards(next,reset = false) {
   else pruneFilters(filters);
   if (reset) $("search").value = "";
   if (reset) $("archiveSearch").value = "";
+  if (reset) archiveFilters.clear();
+  else pruneFilters(archiveFilters,true);
   updateWriteControls();
   renderMetrics(); renderRegistry(); renderCalendar();
   if (!$("archive").hidden) renderArchive();
@@ -1402,19 +1414,26 @@ function setup() {
   };
   setFilterVisibility();
   mobile.addEventListener("change",setFilterVisibility);
-  $("openFilters").onclick = () => {
-    draftFilters = new Map(filters);
-    $("filters").replaceChildren();
-    renderFilterPanel();
-    $("filterDialog").showModal();
-  };
+  for (const [id,archive] of [["openFilters",false],["openArchiveFilters",true]]) {
+    $(id).onclick = () => {
+      editingArchiveFilters = archive;
+      draftFilters = new Map(archive ? archiveFilters : filters);
+      $("filters").replaceChildren();
+      renderFilterPanel();
+      $("filterDialog").showModal();
+    };
+  }
   $("closeFilters").onclick = () => $("filterDialog").close();
   $("resetFilters").onclick = () => { draftFilters.clear(); renderFilterPanel(); };
   $("applyFilters").onclick = () => {
-    filters.clear();
-    for (const [field,value] of draftFilters) filters.set(field,value);
-    $("registryList").open = true;
-    renderRegistry();
+    const selection = editingArchiveFilters ? archiveFilters : filters;
+    selection.clear();
+    for (const [field,value] of draftFilters) selection.set(field,value);
+    if (editingArchiveFilters) renderArchive();
+    else {
+      $("registryList").open = true;
+      renderRegistry();
+    }
     $("filterDialog").close();
   };
   const header = el("tr");
@@ -1448,6 +1467,7 @@ function setup() {
   for (const [id,status] of archiveCategories) {
     $(id).onclick = () => {
       archiveStatus = status;
+      pruneFilters(archiveFilters,true);
       renderArchive();
     };
   }
