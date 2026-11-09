@@ -158,6 +158,14 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .archiveCategories>button{padding-inline:6px;min-height:44px;white-space:nowrap;font-size:clamp(12px,3.5vw,15px)}
 #archiveContent{grid-column:1/-1;min-width:0;margin-top:8px}
 @media(max-width:760px){.archiveCategories{grid-template-columns:minmax(0,1fr);gap:8px}#archiveContent{margin-top:0}}
+.desktopListTitle{display:none}
+@media(min-width:761px){
+  #registryList>summary,#calendar .calendarSection>summary,#archiveCategories{display:none}
+  .desktopListTitle{display:flex;align-items:center;min-height:46px;margin:0 0 8px;padding:10px 14px;border-radius:9px;background:#e9f1fc;color:#15447f;font-size:15px;font-weight:650}
+  #registry .scroll,#calendar .scroll,#archiveDesktop .archiveCardList{max-height:52vh;overflow:auto;scrollbar-gutter:stable}
+  #archiveDesktop tbody{grid-template-columns:minmax(0,1fr)}
+  #archiveDesktop .archiveCardList{margin-top:0}
+}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -176,18 +184,20 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="metricSelection" id="metricSelection" hidden><strong id="metricSelectionLabel"></strong><button id="clearMetric">Показати всі картки</button></div>
 <div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="search" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="activeFilterCount"></span></button></div>
 <div class="activeFilters" id="activeFilters" aria-label="Активні фільтри" hidden></div>
-<details class="cardList" id="registryList" open><summary>Картки здобувачів</summary><button type="button" id="addCard" class="primary registryAdd" aria-haspopup="dialog">+ Додати картку</button><p id="emptyRegistry" hidden></p><div class="scroll"><table><thead id="registryHead"></thead><tbody id="registryBody"></tbody></table></div></details>
+<details class="cardList" id="registryList" open><summary>Картки здобувачів</summary><h3 class="desktopListTitle">Картки здобувачів</h3><button type="button" id="addCard" class="primary registryAdd" aria-haspopup="dialog">+ Додати картку</button><p id="emptyRegistry" hidden></p><div class="scroll"><table><thead id="registryHead"></thead><tbody id="registryBody"></tbody></table></div></details>
 </div>
 <div id="calendar" hidden>
 <label class="registrySearch">Станом на <input id="asOf" type="date" style="max-width:180px"></label>
 <div class="calendarSections">
 <details class="calendarSection" id="leaveCalendar">
 <summary>Закінчення академічної відпустки</summary>
+<h3 class="desktopListTitle">Закінчення академічної відпустки</h3>
 <p id="emptyLeaveCalendar" hidden>На вибрану дату немає строків академвідпусток для контролю.</p>
 <div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="eventBody"></tbody></table></div>
 </details>
 <details class="calendarSection" id="studyCalendar">
 <summary>Завершення навчання</summary>
+<h3 class="desktopListTitle">Завершення навчання</h3>
 <p id="emptyStudyCalendar" hidden>На вибрану дату немає строків завершення навчання для контролю.</p>
 <div class="scroll"><table><thead><tr><th>Здобувач</th><th>Подія</th><th>Дата</th><th>Стан</th></tr></thead><tbody id="studyEventBody"></tbody></table></div>
 </details>
@@ -196,6 +206,10 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section id="archive" class="calendarSection" aria-label="Архів" hidden>
 <div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openArchiveFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="archiveFilterCount"></span></button></div>
 <div class="activeFilters" id="archiveActiveFilters" aria-label="Активні фільтри архіву" hidden></div>
+<div class="calendarSections" id="archiveDesktop" hidden>
+<section class="calendarSection"><h3 class="desktopListTitle">Завершили навчання</h3><p id="archiveCompletedEmpty" hidden></p><div class="archiveCardList"><table><thead id="archiveCompletedHead"></thead><tbody id="archiveCompletedRows"></tbody></table></div></section>
+<section class="calendarSection"><h3 class="desktopListTitle">Відраховані</h3><p id="archiveDismissedEmpty" hidden></p><div class="archiveCardList"><table><thead id="archiveDismissedHead"></thead><tbody id="archiveDismissedRows"></tbody></table></div></section>
+</div>
 <div class="archiveCategories" id="archiveCategories"><button id="archiveCompleted" type="button" aria-expanded="false" aria-controls="archiveContent">Завершили навчання</button><button id="archiveDismissed" type="button" aria-expanded="false" aria-controls="archiveContent">Відраховані</button>
 <div id="archiveContent" hidden>
 <p id="archiveEmpty" role="status" hidden></p>
@@ -705,22 +719,35 @@ function renderArchive() {
   const mobile = mobileLayout.matches;
   const content = $("archiveContent");
   const query = $("archiveSearch").value.trim().toLocaleLowerCase("uk");
+  $("archiveDesktop").hidden = mobile;
+  renderActiveFilters(true);
+  const matches = sectionCards(true,!mobile || Boolean(query)).filter(card =>
+    String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
+    && [...archiveFilters].every(([field,value]) => value === String(display(card,field))));
+  matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
+  const emptyMessage = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
+  if (!mobile) {
+    content.hidden = true;
+    for (const [id,status] of archiveCategories) {
+      const records = matches.filter(card => card["Контингент"] === status);
+      const empty = $(id+"Empty"), rows = $(id+"Rows");
+      empty.hidden = Boolean(records.length);
+      empty.textContent = emptyMessage;
+      rows.replaceChildren(...records.map(shortCardRow));
+      rows.closest(".archiveCardList").scrollTop = 0;
+    }
+    return;
+  }
   for (const [id,status] of archiveCategories) {
     const button = $(id), selected = status === archiveStatus;
     button.hidden = Boolean(query);
     button.setAttribute("aria-expanded",String(selected && archiveExpanded));
-    if (mobile && selected && button.nextElementSibling !== content) button.after(content);
+    if (selected && button.nextElementSibling !== content) button.after(content);
   }
-  if (!mobile && content !== $("archiveCategories").lastElementChild) $("archiveCategories").append(content);
   content.hidden = !archiveExpanded && !query;
-  renderActiveFilters(true);
   if (content.hidden) return;
-  const matches = sectionCards(true,Boolean(query)).filter(card =>
-    String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
-    && [...archiveFilters].every(([field,value]) => value === String(display(card,field))));
-  matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
   $("archiveEmpty").hidden = Boolean(matches.length);
-  $("archiveEmpty").textContent = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
+  $("archiveEmpty").textContent = emptyMessage;
   $("archiveCards").replaceChildren(...matches.map(shortCardRow));
   $("archiveCardList").scrollTop = 0;
 }
@@ -1436,8 +1463,10 @@ function setup() {
     if ($("saveNewCard").disabled) event.preventDefault();
   });
   const mobile = mobileLayout;
+  const calendarBlocks = [$("leaveCalendar"),$("studyCalendar")];
   const setFilterVisibility = () => {
     $("registryList").open = !mobile.matches;
+    for (const block of calendarBlocks) block.open = !mobile.matches;
   };
   setFilterVisibility();
   mobile.addEventListener("change",setFilterVisibility);
@@ -1469,7 +1498,7 @@ function setup() {
   const header = el("tr");
   for (const field of columns) header.append(el("th",field));
   $("registryHead").append(header);
-  $("archiveHead").append(header.cloneNode(true));
+  for (const id of ["archiveHead","archiveCompletedHead","archiveDismissedHead"]) $(id).append(header.cloneNode(true));
   $("search").oninput = () => {
     $("registryList").open = true;
     renderRegistry();
@@ -1503,12 +1532,11 @@ function setup() {
     };
   }
   $("archiveSearch").oninput = renderArchive;
-  const calendarBlocks = [$("leaveCalendar"),$("studyCalendar")];
   const sections = ["registry","calendar","archive"];
   for (const name of sections) {
     $(name+"Tab").onclick = () => {
-      if (name !== "registry") $("registryList").open = false;
-      if (name !== "calendar") {
+      if (mobile.matches && name !== "registry") $("registryList").open = false;
+      if (mobile.matches && name !== "calendar") {
         for (const block of calendarBlocks) block.open = false;
       }
       if (name !== "archive") archiveExpanded = false;
