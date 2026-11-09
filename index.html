@@ -362,6 +362,20 @@ function xml(text) {
 const tags = (element,name) => [...element.getElementsByTagNameNS("*",name)];
 const stringValue = element => tags(element,"t").filter(t => t.parentElement.localName !== "rPh").map(t => t.textContent).join("");
 
+function readIssuedDiploma(value, rowNumber) {
+  const source = String(value ?? "").trim();
+  if (!source) return null;
+  const match = source.match(/^[^;]+;\s*([\p{L}\d]+)\s+(\d+)\s*;\s*(\d{2})\.(\d{2})\.(\d{4})\s*(?:;|$)/u);
+  if (!match) throw Error(`Рядок ${rowNumber} · не вдалося прочитати реквізити виданого диплома.`);
+  const [,series,number,day,month,year] = match;
+  const date = `${year}-${month}-${day}`;
+  const parsed = new Date(date + "T00:00:00Z");
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10) !== date) {
+    throw Error(`Рядок ${rowNumber} · некоректна дата видачі диплома.`);
+  }
+  return {series,number,date};
+}
+
 async function readExport(file) {
   const part = openZip(await file.arrayBuffer());
   const workbook = xml(await part("xl/workbook.xml"));
@@ -405,6 +419,10 @@ async function readExport(file) {
         : /^\d{4}-\d{2}-\d{2}/.test(value) ? Date.parse(value.slice(0,10)) : NaN;
       if (!Number.isFinite(time)) throw new Error(`Рядок ${index+2} · некоректна дата в полі «${field}».`);
       card[field] = new Date(time).toISOString().slice(0,10);
+    }
+    if (card["Контингент"] === COMPLETED) {
+      const diploma = readIssuedDiploma(row.get(header.get("Виданий диплом")),index+2);
+      if (diploma) card.diploma = diploma;
     }
     result.push(card);
   }
@@ -1321,7 +1339,7 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
     if (protectHistory && old?.diploma && card.diploma && JSON.stringify(old.diploma) !== JSON.stringify(card.diploma)) {
       throw Error("Копія містить інші реквізити диплома. Спільний реєстр залишено без змін.");
     }
-    const incomingCard = old?.diploma && !card.diploma ? {...card,diploma:old.diploma} : card;
+    const incomingCard = old?.diploma && (preserveManual || !card.diploma) ? {...card,diploma:old.diploma} : card;
     if (protectHistory && old?.manualStatus) {
       const before = old.statusHistory ?? [], after = card.statusHistory ?? [];
       if (before.some((entry,index) => JSON.stringify(entry) !== JSON.stringify(after[index]))
