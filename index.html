@@ -1504,14 +1504,6 @@ function setup() {
   }
   $("archiveSearch").oninput = renderArchive;
   const calendarBlocks = [$("leaveCalendar"),$("studyCalendar")];
-  for (const block of calendarBlocks) {
-    block.addEventListener("toggle",() => {
-      if (!block.open) return;
-      for (const other of calendarBlocks) {
-        if (other !== block) other.open = false;
-      }
-    });
-  }
   const sections = ["registry","calendar","archive"];
   for (const name of sections) {
     $(name+"Tab").onclick = () => {
