@@ -38,26 +38,26 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .cardClose{float:none;margin:0}
 .cardList summary{display:list-item;cursor:pointer;background:#e9f1fc;color:#15447f;border-radius:8px;padding:10px;font-weight:650}
 .mobileSort{display:block;max-width:320px;margin-bottom:8px;font-size:13px}
-#registry table,#calendar table{display:block}
-#registry thead,#calendar thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-#registry tbody,#calendar tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-#registry tbody tr,#calendar tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:5px 10px;margin:0;padding:10px 12px;background:#f8fbff;border:1px solid #dce6f1;border-radius:12px}
-#registry tbody tr:hover,#calendar tbody tr:hover{border-color:#a9c5e9}
-#registry td,#calendar td{display:block;min-width:0;padding:0;border:0;font-size:13px;overflow-wrap:anywhere}
-#registry td:first-child,#calendar td:first-child{grid-column:1/-1}
-#registry td:first-child button,#calendar td:first-child button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;color:#173e71;font-size:15px;font-weight:750;text-decoration:none}
-#registry td:first-child button::after,#calendar td:first-child button::after{content:"›";font-size:19px;line-height:1;color:#397bc9}
-#registry td:nth-child(2){grid-column:2;grid-row:2;color:#405571;white-space:nowrap}
-#registry td:nth-child(2)::after{content:" курс"}
-#registry td:nth-child(3){grid-column:1/-1;grid-row:3;color:#405571}
-#registry td:nth-child(4){grid-column:1/-1;grid-row:5;color:#405571}
-#registry td:nth-child(5){grid-column:1/-1;grid-row:4;font-weight:600}
-#registry td:nth-child(6){grid-column:1;grid-row:2}
+:is(#registry,#archive) table,#calendar table{display:block}
+:is(#registry,#archive) thead,#calendar thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+:is(#registry,#archive) tbody,#calendar tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+:is(#registry,#archive) tbody tr,#calendar tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:5px 10px;margin:0;padding:10px 12px;background:#f8fbff;border:1px solid #dce6f1;border-radius:12px}
+:is(#registry,#archive) tbody tr:hover,#calendar tbody tr:hover{border-color:#a9c5e9}
+:is(#registry,#archive) td,#calendar td{display:block;min-width:0;padding:0;border:0;font-size:13px;overflow-wrap:anywhere}
+:is(#registry,#archive) td:first-child,#calendar td:first-child{grid-column:1/-1}
+:is(#registry,#archive) td:first-child button,#calendar td:first-child button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;color:#173e71;font-size:15px;font-weight:750;text-decoration:none}
+:is(#registry,#archive) td:first-child button::after,#calendar td:first-child button::after{content:"›";font-size:19px;line-height:1;color:#397bc9}
+:is(#registry,#archive) td:nth-child(2){grid-column:2;grid-row:2;color:#405571;white-space:nowrap}
+:is(#registry,#archive) td:nth-child(2)::after{content:" курс"}
+:is(#registry,#archive) td:nth-child(3){grid-column:1/-1;grid-row:3;color:#405571}
+:is(#registry,#archive) td:nth-child(4){grid-column:1/-1;grid-row:5;color:#405571}
+:is(#registry,#archive) td:nth-child(5){grid-column:1/-1;grid-row:4;font-weight:600}
+:is(#registry,#archive) td:nth-child(6){grid-column:1;grid-row:2}
 .registryStatus{display:inline-block;border-radius:12px;background:#e1edff;color:#174d91;padding:2px 8px;font-weight:650}
 .registryStatus.leave{background:#fff0d5;color:#754b05}.registryStatus.done{background:#e8eff9;color:#405571}.registryStatus.dismissed{background:#ffe5e1;color:#83291e}
 #calendar td:nth-child(3){text-align:right;white-space:nowrap;font-weight:650}
 #calendar td:last-child{grid-column:1/-1}
-@media(max-width:760px){#registry tbody,#calendar tbody{grid-template-columns:minmax(0,1fr)}#registry td:nth-child(4){display:none}}
+@media(max-width:760px){:is(#registry,#archive) tbody,#calendar tbody{grid-template-columns:minmax(0,1fr)}:is(#registry,#archive) td:nth-child(4){display:none}}
 .appMark{display:block;flex:none;border-radius:8px}.siteFooter a.footerBlock{text-decoration:none}.siteFooter a.footerBlock:hover{background:#dceaff}
 @media(max-width:760px){.appMark{width:28px;height:28px;border-radius:6px}}
 .metrics .metric{border:0;border-radius:19px;background:#e5efff;color:#627681}
@@ -148,13 +148,9 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 #calendar .calendarSection tbody{grid-template-columns:minmax(0,1fr)}
 .calendarSection p{margin:8px 0;color:#405571}
 @media(max-width:760px){.calendarSections{grid-template-columns:minmax(0,1fr);gap:8px}}
-.archiveCards{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0 0;padding:0}
-.archiveCards li{display:grid;gap:4px;padding:10px 12px;border:1px solid #dce6f1;border-radius:12px;background:#f8fbff;overflow-wrap:anywhere}
-.archiveCards button{padding:4px 0;background:none;text-align:left}
-.archiveCards span{font-size:13px}
+.archiveCardList{margin-top:14px}
 .archiveCategories{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .archiveCategories button{padding-inline:6px;min-height:44px;white-space:nowrap;font-size:clamp(12px,3.5vw,15px)}
-@media(max-width:760px){.archiveCards{grid-template-columns:minmax(0,1fr)}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -195,7 +191,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="registryControls"><label class="registrySearch">Пошук за ПІБ<input id="archiveSearch" type="search" placeholder="Введіть ім’я або прізвище"></label><button type="button" id="openArchiveFilters" aria-haspopup="dialog"><span class="filterDesktopLabel">Фільтри</span><span class="filterMobileLabel">Фільтр</span><span id="archiveFilterCount"></span></button></div>
 <div class="activeFilters" id="archiveActiveFilters" aria-label="Активні фільтри архіву" hidden></div>
 <p id="archiveEmpty" role="status" hidden></p>
-<ul id="archiveCards" class="archiveCards"></ul>
+<div class="archiveCardList"><table><thead id="archiveHead"></thead><tbody id="archiveCards"></tbody></table></div>
 </section>
 </section>
 <div class="toolbar backupActions"><button id="backup">Зберегти копію реєстру</button><button id="restore">Відкрити копію</button><input id="backupFile" type="file" accept=".json" hidden></div>
@@ -672,6 +668,23 @@ function nameButton(record) {
   button.onclick = () => openCard(record);
   return button;
 }
+function shortCardRow(record) {
+  const row = el("tr");
+  for (const field of columns) {
+    const cell = el("td");
+    if (field === "Здобувач") {
+      cell.append(nameButton(record));
+    } else if (field === "Контингент") {
+      const badge = el("span",display(record,field));
+      badge.className = "registryStatus "+["active","leave","done","dismissed"][statuses.indexOf(record[field])];
+      cell.append(badge);
+    } else {
+      cell.textContent = display(record,field);
+    }
+    row.append(cell);
+  }
+  return row;
+}
 const archiveCategories = [["archiveCompleted",COMPLETED],["archiveDismissed",DISMISSED]];
 let archiveStatus = COMPLETED;
 function renderArchive() {
@@ -686,11 +699,7 @@ function renderArchive() {
   matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
   $("archiveEmpty").hidden = Boolean(matches.length);
   $("archiveEmpty").textContent = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
-  $("archiveCards").replaceChildren(...matches.map(record => {
-    const item = el("li");
-    item.append(nameButton(record),el("span",display(record,"Освітня програма")));
-    return item;
-  }));
+  $("archiveCards").replaceChildren(...matches.map(shortCardRow));
 }
 function renderRegistry() {
   renderActiveFilters();
@@ -742,23 +751,10 @@ function renderRegistry() {
       heading.append(cell);
       headings.push(heading);
     }
-    const row = el("tr");
+    const row = shortCardRow(record);
     if (section) {
       row.hidden = !section.open;
       section.rows.push(row);
-    }
-    for (const field of columns) {
-      const cell = el("td");
-      if (field === "Здобувач") {
-        cell.append(nameButton(record));
-      } else if (field === "Контингент") {
-        const badge = el("span",display(record,field));
-        badge.className = "registryStatus "+["active","leave","done","dismissed"][statuses.indexOf(record[field])];
-        cell.append(badge);
-      } else {
-        cell.textContent = display(record,field);
-      }
-      row.append(cell);
     }
     if (group?.date) {
       const label = selectedMetric === 1 ? "Відпустка до" : "Дата для контролю";
@@ -1439,6 +1435,7 @@ function setup() {
   const header = el("tr");
   for (const field of columns) header.append(el("th",field));
   $("registryHead").append(header);
+  $("archiveHead").append(header.cloneNode(true));
   $("search").oninput = () => {
     $("registryList").open = true;
     renderRegistry();
