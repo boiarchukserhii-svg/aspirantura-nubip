@@ -902,8 +902,13 @@ async function saveHistoryEdit(record,updated,message = "Історію карт
   showNotice(saved ? message : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
   if ($("card").open) openCard(updated);
 }
+let diplomaActionAvailable = false;
+function canEditDiploma(record) {
+  const status = record["Контингент"];
+  return status !== DISMISSED && (status !== COMPLETED || Boolean(record.diploma));
+}
 function editDiploma(record) {
-  if (!canEdit()) return;
+  if (!canEdit() || !canEditDiploma(record)) return;
   const dialog = $("diplomaDialog"), form = $("diplomaForm"), errorBox = $("diplomaError");
   const series = $("diplomaSeries"), number = $("diplomaNumber"), date = $("diplomaDate");
   const now = new Date();
@@ -1042,6 +1047,8 @@ function openCard(selected) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
     $("changeStatus").onclick = () => editStatus(record);
+    diplomaActionAvailable = canEditDiploma(record);
+    $("editDiploma").hidden = !canEdit() || !diplomaActionAvailable;
     $("editDiploma").textContent = record.diploma ? "Змінити реквізити диплома" : "Видати диплом";
     $("editDiploma").onclick = () => editDiploma(record);
     $("profileDiploma").hidden = !record.diploma;
@@ -1245,10 +1252,11 @@ function updateWriteControls() {
   $("pick").disabled = $("restore").disabled = !editable;
   $("export").disabled = $("backup").disabled = !editable || !cards.length;
   $("changeStatus").hidden = !editable;
-  $("editDiploma").hidden = !editable;
+  $("editDiploma").hidden = !editable || !diplomaActionAvailable;
   $("addCard").hidden = !editable;
 }
 function clearSharedView() {
+  diplomaActionAvailable = false;
   $("newCardDialog").close();
   $("newCardForm").reset();
   $("diplomaDialog").close();
