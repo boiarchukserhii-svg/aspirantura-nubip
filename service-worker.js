@@ -1,4 +1,4 @@
-const CACHE = "aspirantura-nubip-app-v61";
+const CACHE = "aspirantura-nubip-app-v62";
 const HOME = new URL("./",self.location).href;
 async function refreshPage(request) {
   const response = await fetch(request,{cache:"no-cache"});
