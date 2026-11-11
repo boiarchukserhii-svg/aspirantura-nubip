@@ -1056,6 +1056,41 @@ async function undoStatus(record,index,entry,order,button) {
   finally { button.disabled = false; }
 }
 
+function canRemoveDismissal(record,index) {
+  const history = record.statusHistory ?? [];
+  const entry = history[index];
+  const previous = entry?.previous?.status ?? entry?.from;
+  return entry?.to === DISMISSED && record["Контингент"] === DISMISSED
+    && statuses.includes(previous) && previous !== DISMISSED
+    && !Number.isInteger(entry.correctionOf) && !Number.isInteger(entry.undoOf)
+    && history.slice(index+1).every(item => item.correctionOf === index);
+}
+function removeDismissalState(record,index) {
+  if (!canRemoveDismissal(record,index)) {
+    throw Error("Можна видалити лише останнє помилкове відрахування. Відкрийте актуальну картку.");
+  }
+  const history = record.statusHistory;
+  const entry = history[index];
+  return {...record,"Контингент":entry.previous?.status ?? entry.from,
+    manualStatus:true,statusHistory:history.slice(0,index)};
+}
+async function removeDismissal(record,index,button) {
+  if (!canEdit()) return;
+  const updated = removeDismissalState(record,index);
+  if (!confirm("Видалити помилкове відрахування для «"+display(record,"Здобувач")+"» з історії та повернути статус «"+
+      updated["Контингент"]+"»? Перед зміною буде завантажено резервну копію цієї картки.")) return;
+  button.disabled = true;
+  try {
+    download("Аспіранти — картка "+record["ID картки"]+" до виправлення.json","application/json",
+      JSON.stringify({format:storageKey,cards:[record]}));
+    await saveHistoryEdit(record,updated,"Помилкове відрахування видалено з історії. Попередній статус відновлено.");
+  } catch (error) {
+    alert(sync.api?.errorText(error) ?? error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function openCard(selected) {
   const isArchived = card => [COMPLETED,DISMISSED].includes(card["Контингент"]);
   const related = cards.filter(card => card["ID ФО"] === selected["ID ФО"])
@@ -1156,6 +1191,12 @@ function openCard(selected) {
           undo.type = "button";
           undo.onclick = () => undoStatus(record,index,entry,order,undo);
           actions.append(undo);
+          if (canRemoveDismissal(record,index)) {
+            const remove = el("button","Видалити помилкове відрахування");
+            remove.type = "button";
+            remove.onclick = () => removeDismissal(record,index,remove);
+            actions.append(remove);
+          }
         }
         item.append(actions);
       }

@@ -1,4 +1,4 @@
-const CACHE = "aspirantura-nubip-app-v75-zakon";
+const CACHE = "aspirantura-nubip-app-v76-remove-dismissal";
 const HOME = new URL("./",self.location).href;
 const FONTS = ["Zakon-Regular.otf","Zakon-Bold.otf"].map(name => new URL(name,HOME).href);
 async function refreshPage(request) {
