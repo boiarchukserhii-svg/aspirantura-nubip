@@ -1,5 +1,6 @@
-const CACHE = "aspirantura-nubip-app-v74";
+const CACHE = "aspirantura-nubip-app-v75-zakon";
 const HOME = new URL("./",self.location).href;
+const FONTS = ["Zakon-Regular.otf","Zakon-Bold.otf"].map(name => new URL(name,HOME).href);
 async function refreshPage(request) {
   const response = await fetch(request,{cache:"no-cache"});
   if (response.ok && !response.redirected &&
@@ -12,6 +13,7 @@ async function refreshPage(request) {
 self.addEventListener("install",event => {
   event.waitUntil((async () => {
     await refreshPage(HOME);
+    await (await caches.open(CACHE)).addAll(FONTS);
     await self.skipWaiting();
   })());
 });
@@ -22,6 +24,12 @@ self.addEventListener("activate",event => event.waitUntil((async () => {
   await self.clients.claim();
 })()));
 self.addEventListener("fetch",event => {
+  if (event.request.method !== "GET") return;
+  if (FONTS.includes(event.request.url)) {
+    event.respondWith(caches.open(CACHE).then(async cache =>
+      (await cache.match(event.request)) ?? fetch(event.request)));
+    return;
+  }
   if (event.request.mode !== "navigate") return;
   const target = new URL(event.request.url);
   if (new URL("./",target).href !== HOME ||
