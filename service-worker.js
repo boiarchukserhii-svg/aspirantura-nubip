@@ -1,4 +1,4 @@
-const CACHE = "aspirantura-nubip-app-v77-remove-cancelled-dismissal";
+const CACHE = "aspirantura-nubip-app-v78-study-end";
 const HOME = new URL("./",self.location).href;
 const FONTS = ["Zakon-Regular.otf","Zakon-Bold.otf"].map(name => new URL(name,HOME).href);
 async function refreshPage(request) {

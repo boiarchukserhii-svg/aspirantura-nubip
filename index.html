@@ -169,6 +169,9 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   #archiveDesktop tbody{grid-template-columns:minmax(0,1fr)}
   #archiveDesktop .archiveCardList{margin-top:0}
 }
+
+#changeStudyEnd{width:min(100%,260px);min-height:41px}
+@media(max-width:760px){.statusTools{flex-wrap:wrap}#changeStudyEnd{flex:1 0 100%;width:100%;order:2}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -231,7 +234,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
 <h3 id="profileDiplomaTitle">Диплом доктора філософії</h3><dl id="profileDiplomaDetails"></dl>
 </section>
-<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
+<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="changeStudyEnd" aria-haspopup="dialog">Зміна дати завершення навчання</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
@@ -246,6 +249,17 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Номер наказу<input id="statusOrderNumber" maxlength="80" required></label>
 <label>Дата наказу<input id="statusOrderDate" type="date" required></label>
 <div class="statusFormActions"><button type="button" id="cancelStatus">Скасувати</button><button type="submit" id="saveStatus" class="primary">Зберегти зміни</button></div>
+</form>
+</dialog>
+<dialog id="studyEndDialog" aria-labelledby="studyEndTitle">
+<h2 id="studyEndTitle">Зміна дати завершення навчання</h2>
+<form id="studyEndForm" class="statusForm">
+<p id="currentStudyEnd"></p>
+<label>Нова дата завершення навчання<input id="newStudyEnd" type="date" required></label>
+<label>Номер наказу<input id="studyEndOrderNumber" maxlength="80" required></label>
+<label>Дата наказу<input id="studyEndOrderDate" type="date" required></label>
+<p id="studyEndError" role="alert" hidden></p>
+<div class="statusFormActions"><button type="button" id="cancelStudyEnd">Скасувати</button><button type="submit" id="saveStudyEnd" class="primary">Зберегти зміни</button></div>
 </form>
 </dialog>
 <dialog id="orderDialog" aria-labelledby="orderTitle">
@@ -1001,6 +1015,43 @@ function editDiploma(record) {
   };
   dialog.showModal();
 }
+function editStudyEnd(record) {
+  if (!canEdit() || record.diploma) return;
+  const dialog = $("studyEndDialog"), form = $("studyEndForm"), errorBox = $("studyEndError");
+  form.reset();
+  $("currentStudyEnd").textContent = "Поточна дата · "+formatDate(record["Завершення навчання"]);
+  const input = $("newStudyEnd");
+  input.value = record["Завершення навчання"] ?? "";
+  input.min = record["Початок навчання"] ?? "";
+  errorBox.hidden = true;
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if ($("saveStudyEnd").disabled) return;
+    errorBox.hidden = true;
+    try {
+      if (!form.reportValidity()) return;
+      const studyEnd = input.value, orderNumber = $("studyEndOrderNumber").value.trim(),
+        orderDate = $("studyEndOrderDate").value;
+      if (!orderNumber) throw Error("Вкажіть номер наказу.");
+      if (record["Початок навчання"] && studyEnd < record["Початок навчання"])
+        throw Error("Дата завершення не може бути ранішою за початок навчання.");
+      if (studyEnd === record["Завершення навчання"]) throw Error("Виберіть іншу дату завершення навчання.");
+      const entry = {action:"Змінено дату завершення навчання",studyEndOnly:true,
+        from:record["Контингент"],to:record["Контингент"],date:orderDate,orderNumber,orderDate,studyEnd,
+        previous:{status:record["Контингент"],studyEnd:record["Завершення навчання"] ?? null}};
+      $("saveStudyEnd").disabled = $("cancelStudyEnd").disabled = true;
+      await saveHistoryEdit(record,{...record,"Завершення навчання":studyEnd,manualStatus:true,
+        statusHistory:[...(record.statusHistory ?? []),entry]},"Дату завершення навчання змінено.");
+      dialog.close();
+    } catch (error) {
+      errorBox.textContent = sync.api?.errorText(error) ?? error.message;
+      errorBox.hidden = false;
+    } finally {
+      $("saveStudyEnd").disabled = $("cancelStudyEnd").disabled = false;
+    }
+  };
+  dialog.showModal();
+}
 function correctOrder(record,index,currentOrder) {
   const dialog = $("orderDialog"), form = $("orderForm"), errorBox = $("orderError");
   const number = $("correctOrderNumber"), date = $("correctOrderDate");
@@ -1039,7 +1090,7 @@ function correctOrder(record,index,currentOrder) {
 }
 async function undoStatus(record,index,entry,order,button) {
   const previous = entry.previous ?? {status:entry.from};
-  const restoreLabel = Number.isInteger(entry.courseFrom) ? `курс ${entry.courseFrom}` : `статус «${previous.status}»`;
+  const restoreLabel = entry.studyEndOnly ? "дату завершення навчання "+formatDate(previous.studyEnd) : Number.isInteger(entry.courseFrom) ? `курс ${entry.courseFrom}` : `статус «${previous.status}»`;
   if (!confirm(`Скасувати зміну «${entry.action}» та відновити ${restoreLabel}?`)) return;
   const updated = {...record,"Контингент":previous.status,manualStatus:true};
   if (Number.isInteger(entry.courseFrom)) updated["Курс"] = entry.courseFrom;
@@ -1048,7 +1099,7 @@ async function undoStatus(record,index,entry,order,button) {
     if (entry.reason) updated[leaveFields[1]] = previous.reason;
     if (entry.studyEnd) updated["Завершення навчання"] = previous.studyEnd;
   }
-  updated.statusHistory = [...record.statusHistory,{action:"Зміну статусу скасовано",date:entry.date,
+  updated.statusHistory = [...record.statusHistory,{action:entry.studyEndOnly ? "Зміну дати завершення навчання скасовано" : "Зміну статусу скасовано",date:entry.date,
     orderNumber:order.orderNumber,orderDate:order.orderDate,undoOf:index}];
   button.disabled = true;
   try { await saveHistoryEdit(record,updated); }
@@ -1140,6 +1191,7 @@ function openCard(selected) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
     $("changeStatus").onclick = () => editStatus(record);
+    $("changeStudyEnd").onclick = () => editStudyEnd(record);
     selectedProfile = record;
     updateProfileActions();
     $("editDiploma").onclick = () => editDiploma(record);
@@ -1177,7 +1229,8 @@ function openCard(selected) {
       if (entry.leaveEnd) item.append(el("div",`Відпустка до ${formatDate(entry.leaveEnd)}`));
       if (entry.reason) item.append(el("div",entry.reason));
       if (entry.previousUniversity) item.append(el("div",`Попередній ЗВО · ${entry.previousUniversity}`));
-      if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
+      if (entry.studyEndOnly) item.append(el("div","Попередня дата · "+formatDate(entry.previous?.studyEnd)));
+       if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
       if (Number.isInteger(entry.courseTo)) item.append(el("div",`${entry.courseFrom} курс → ${entry.courseTo} курс`));
       if (cancelled.has(index)) {
         const marker = el("strong","Скасовано");
@@ -1357,6 +1410,7 @@ function updateProfileActions() {
   const show = canEdit() && selectedProfile !== null && !selectedProfile.diploma;
   $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
   $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
+  $("changeStudyEnd").hidden = !show;
 }
 function updateWriteControls() {
   const editable = canEdit();
@@ -1367,6 +1421,8 @@ function updateWriteControls() {
 }
 function clearSharedView() {
   selectedProfile = null;
+  $("studyEndDialog").close();
+  $("studyEndForm").reset();
   $("newCardDialog").close();
   $("newCardForm").reset();
   $("diplomaDialog").close();
@@ -1576,6 +1632,10 @@ function setup() {
   };
   $("closeCard").onclick = () => $("card").close();
   $("card").addEventListener("close",() => { $("details").parentElement.open = false; });
+  $("cancelStudyEnd").onclick = () => $("studyEndDialog").close();
+  $("studyEndDialog").addEventListener("cancel",event => {
+    if ($("saveStudyEnd").disabled) event.preventDefault();
+  });
   $("cancelStatus").onclick = () => $("statusDialog").close();
   $("closeOrder").onclick = () => $("orderDialog").close();
   $("cancelDiploma").onclick = () => $("diplomaDialog").close();
