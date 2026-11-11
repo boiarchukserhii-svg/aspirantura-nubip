@@ -170,8 +170,6 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   #archiveDesktop .archiveCardList{margin-top:0}
 }
 
-#changeStudyEnd{width:min(100%,260px);min-height:41px}
-@media(max-width:760px){.statusTools{flex-wrap:wrap}#changeStudyEnd{flex:1 0 100%;width:100%;order:2}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -234,7 +232,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
 <h3 id="profileDiplomaTitle">Диплом доктора філософії</h3><dl id="profileDiplomaDetails"></dl>
 </section>
-<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="changeStudyEnd" aria-haspopup="dialog">Зміна дати завершення навчання</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
+<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
@@ -249,17 +247,6 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Номер наказу<input id="statusOrderNumber" maxlength="80" required></label>
 <label>Дата наказу<input id="statusOrderDate" type="date" required></label>
 <div class="statusFormActions"><button type="button" id="cancelStatus">Скасувати</button><button type="submit" id="saveStatus" class="primary">Зберегти зміни</button></div>
-</form>
-</dialog>
-<dialog id="studyEndDialog" aria-labelledby="studyEndTitle">
-<h2 id="studyEndTitle">Зміна дати завершення навчання</h2>
-<form id="studyEndForm" class="statusForm">
-<p id="currentStudyEnd"></p>
-<label>Нова дата завершення навчання<input id="newStudyEnd" type="date" required></label>
-<label>Номер наказу<input id="studyEndOrderNumber" maxlength="80" required></label>
-<label>Дата наказу<input id="studyEndOrderDate" type="date" required></label>
-<p id="studyEndError" role="alert" hidden></p>
-<div class="statusFormActions"><button type="button" id="cancelStudyEnd">Скасувати</button><button type="submit" id="saveStudyEnd" class="primary">Зберегти зміни</button></div>
 </form>
 </dialog>
 <dialog id="orderDialog" aria-labelledby="orderTitle">
@@ -330,6 +317,7 @@ const COMPLETED = "Завершив(-ла) навчання", DISMISSED = "Ві�
 const COMPLETION_YEAR = 2027;
 const statuses = [ACTIVE,LEAVE,COMPLETED,DISMISSED];
 const statusActions = [
+  {id:"studyEnd",label:"Зміна дати завершення навчання"},
   {id:"promote",label:"Перевести на наступний рік навчання",target:ACTIVE},
   {id:"leave",label:"Надати академвідпустку",target:LEAVE},
   {id:"extend",label:"Продовжити академвідпустку",target:LEAVE},
@@ -857,6 +845,7 @@ function editStatus(record) {
   const course = Number(record["Курс"]);
   const options = statusActions.filter(action => {
     if (action.id === "promote") return current === ACTIVE && Number.isSafeInteger(course) && course >= 1 && course < Number.MAX_SAFE_INTEGER;
+    if (action.id === "studyEnd") return true;
     if (action.id === "extend") return current === LEAVE;
     return action.target !== current;
   });
@@ -887,14 +876,19 @@ function editStatus(record) {
     $("statusLeaveEnd").required = leave;
     $("leaveReasonLabel").hidden = action?.id !== "leave";
     $("statusLeaveReason").required = action?.id === "leave";
-    $("studyEndLabel").hidden = action?.id !== "resume";
+    $("studyEndLabel").hidden = !["resume","studyEnd"].includes(action?.id);
+    $("statusStudyEnd").required = action?.id === "studyEnd";
     const effective = $("statusEffective").value;
     const until = $("statusLeaveEnd").value;
     $("statusLeaveEnd").setCustomValidity(leave && until && (until < effective || (extend && until <= (record["Статус по"] ?? "")))
       ? "Вкажіть дату завершення, що відповідає періоду відпустки. Для продовження вона має бути пізнішою за чинну дату." : "");
     const studyEnd = $("statusStudyEnd").value;
     $("statusStudyEnd").setCustomValidity(action?.id === "resume" && studyEnd && studyEnd < effective
-      ? "Дата завершення має бути в день поновлення або пізніше." : "");
+      ? "Дата завершення має бути в день поновлення або пізніше."
+      : action?.id === "studyEnd" && studyEnd && record["Початок навчання"] && studyEnd < record["Початок навчання"]
+      ? "Дата завершення не може бути ранішою за початок навчання."
+      : action?.id === "studyEnd" && studyEnd === record["Завершення навчання"]
+      ? "Виберіть іншу дату завершення навчання." : "");
     $("statusOrderNumber").setCustomValidity($("statusOrderNumber").value && !$("statusOrderNumber").value.trim()
       ? "Вкажіть номер наказу." : "");
     $("statusLeaveReason").setCustomValidity(action?.id === "leave" && $("statusLeaveReason").value && !$("statusLeaveReason").value.trim()
@@ -914,8 +908,9 @@ function editStatus(record) {
       alert("Цю картку вже оновлено. Відкрийте її з реєстру повторно.");
       return;
     }
-    const updated = {...record,"Контингент":action.target,manualStatus:true};
-    const entry = {action:action.label,from:current,to:action.target,date:$("statusEffective").value,
+    const target = action.id === "studyEnd" ? current : action.target;
+    const updated = {...record,"Контингент":target,manualStatus:true};
+    const entry = {action:action.label,from:current,to:target,date:$("statusEffective").value,
       orderNumber:$("statusOrderNumber").value.trim(),orderDate:$("statusOrderDate").value,
       previous:{status:current,leaveEnd:record["Статус по"] ?? null,
         reason:record[leaveFields[1]] ?? null,studyEnd:record["Завершення навчання"] ?? null}};
@@ -923,7 +918,11 @@ function editStatus(record) {
       entry.leaveEnd = updated["Статус по"] = $("statusLeaveEnd").value;
       if (action.id === "leave") entry.reason = updated[leaveFields[1]] = $("statusLeaveReason").value.trim();
     }
-    if (action.id === "resume" && $("statusStudyEnd").value) {
+    if (action.id === "studyEnd") {
+      entry.studyEndOnly = true;
+      entry.action = "Змінено дату завершення навчання";
+    }
+    if (["resume","studyEnd"].includes(action.id) && $("statusStudyEnd").value) {
       entry.studyEnd = updated["Завершення навчання"] = $("statusStudyEnd").value;
     }
     if (action.id === "promote") {
@@ -1011,43 +1010,6 @@ function editDiploma(record) {
       errorBox.hidden = false;
     } finally {
       $("saveDiploma").disabled = $("cancelDiploma").disabled = false;
-    }
-  };
-  dialog.showModal();
-}
-function editStudyEnd(record) {
-  if (!canEdit() || record.diploma) return;
-  const dialog = $("studyEndDialog"), form = $("studyEndForm"), errorBox = $("studyEndError");
-  form.reset();
-  $("currentStudyEnd").textContent = "Поточна дата · "+formatDate(record["Завершення навчання"]);
-  const input = $("newStudyEnd");
-  input.value = record["Завершення навчання"] ?? "";
-  input.min = record["Початок навчання"] ?? "";
-  errorBox.hidden = true;
-  form.onsubmit = async event => {
-    event.preventDefault();
-    if ($("saveStudyEnd").disabled) return;
-    errorBox.hidden = true;
-    try {
-      if (!form.reportValidity()) return;
-      const studyEnd = input.value, orderNumber = $("studyEndOrderNumber").value.trim(),
-        orderDate = $("studyEndOrderDate").value;
-      if (!orderNumber) throw Error("Вкажіть номер наказу.");
-      if (record["Початок навчання"] && studyEnd < record["Початок навчання"])
-        throw Error("Дата завершення не може бути ранішою за початок навчання.");
-      if (studyEnd === record["Завершення навчання"]) throw Error("Виберіть іншу дату завершення навчання.");
-      const entry = {action:"Змінено дату завершення навчання",studyEndOnly:true,
-        from:record["Контингент"],to:record["Контингент"],date:orderDate,orderNumber,orderDate,studyEnd,
-        previous:{status:record["Контингент"],studyEnd:record["Завершення навчання"] ?? null}};
-      $("saveStudyEnd").disabled = $("cancelStudyEnd").disabled = true;
-      await saveHistoryEdit(record,{...record,"Завершення навчання":studyEnd,manualStatus:true,
-        statusHistory:[...(record.statusHistory ?? []),entry]},"Дату завершення навчання змінено.");
-      dialog.close();
-    } catch (error) {
-      errorBox.textContent = sync.api?.errorText(error) ?? error.message;
-      errorBox.hidden = false;
-    } finally {
-      $("saveStudyEnd").disabled = $("cancelStudyEnd").disabled = false;
     }
   };
   dialog.showModal();
@@ -1191,7 +1153,6 @@ function openCard(selected) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
     $("changeStatus").onclick = () => editStatus(record);
-    $("changeStudyEnd").onclick = () => editStudyEnd(record);
     selectedProfile = record;
     updateProfileActions();
     $("editDiploma").onclick = () => editDiploma(record);
@@ -1410,7 +1371,6 @@ function updateProfileActions() {
   const show = canEdit() && selectedProfile !== null && !selectedProfile.diploma;
   $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
   $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
-  $("changeStudyEnd").hidden = !show;
 }
 function updateWriteControls() {
   const editable = canEdit();
@@ -1421,8 +1381,6 @@ function updateWriteControls() {
 }
 function clearSharedView() {
   selectedProfile = null;
-  $("studyEndDialog").close();
-  $("studyEndForm").reset();
   $("newCardDialog").close();
   $("newCardForm").reset();
   $("diplomaDialog").close();
@@ -1632,10 +1590,6 @@ function setup() {
   };
   $("closeCard").onclick = () => $("card").close();
   $("card").addEventListener("close",() => { $("details").parentElement.open = false; });
-  $("cancelStudyEnd").onclick = () => $("studyEndDialog").close();
-  $("studyEndDialog").addEventListener("cancel",event => {
-    if ($("saveStudyEnd").disabled) event.preventDefault();
-  });
   $("cancelStatus").onclick = () => $("statusDialog").close();
   $("closeOrder").onclick = () => $("orderDialog").close();
   $("cancelDiploma").onclick = () => $("diplomaDialog").close();
