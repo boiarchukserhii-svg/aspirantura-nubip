@@ -1060,14 +1060,16 @@ function canRemoveDismissal(record,index) {
   const history = record.statusHistory ?? [];
   const entry = history[index];
   const previous = entry?.previous?.status ?? entry?.from;
-  return entry?.to === DISMISSED && record["Контингент"] === DISMISSED
+  const following = history.slice(index+1);
+  const cancelled = following.some(item => item.undoOf === index);
+  return entry?.to === DISMISSED && record["Контингент"] === (cancelled ? previous : DISMISSED)
     && statuses.includes(previous) && previous !== DISMISSED
     && !Number.isInteger(entry.correctionOf) && !Number.isInteger(entry.undoOf)
-    && history.slice(index+1).every(item => item.correctionOf === index);
+    && following.every(item => item.correctionOf === index || item.undoOf === index);
 }
 function removeDismissalState(record,index) {
   if (!canRemoveDismissal(record,index)) {
-    throw Error("Можна видалити лише останнє помилкове відрахування. Відкрийте актуальну картку.");
+    throw Error("Можна видалити лише останнє відрахування або його скасований запис. Відкрийте актуальну картку.");
   }
   const history = record.statusHistory;
   const entry = history[index];
@@ -1077,8 +1079,11 @@ function removeDismissalState(record,index) {
 async function removeDismissal(record,index,button) {
   if (!canEdit()) return;
   const updated = removeDismissalState(record,index);
-  if (!confirm("Видалити помилкове відрахування для «"+display(record,"Здобувач")+"» з історії та повернути статус «"+
-      updated["Контингент"]+"»? Перед зміною буде завантажено резервну копію цієї картки.")) return;
+  const cancelled = record.statusHistory.slice(index+1).some(item => item.undoOf === index);
+  const question = cancelled
+    ? "Видалити скасований запис про відрахування для «"+display(record,"Здобувач")+"» з історії? Після видалення статус «"+updated["Контингент"]+"»."
+    : "Видалити помилкове відрахування для «"+display(record,"Здобувач")+"» з історії та повернути статус «"+updated["Контингент"]+"»?";
+  if (!confirm(question+" Перед зміною буде завантажено резервну копію цієї картки.")) return;
   button.disabled = true;
   try {
     download("Аспіранти — картка "+record["ID картки"]+" до виправлення.json","application/json",
@@ -1178,6 +1183,14 @@ function openCard(selected) {
         const marker = el("strong","Скасовано");
         marker.className = "cancelledStatus";
         item.append(marker);
+        if (canEdit() && canRemoveDismissal(record,index)) {
+          const actions = el("div"); actions.className = "statusHistoryActions";
+          const remove = el("button","Видалити скасований запис");
+          remove.type = "button";
+          remove.onclick = () => removeDismissal(record,index,remove);
+          actions.append(remove);
+          item.append(actions);
+        }
       } else if (canEdit()) {
         const actions = el("div"); actions.className = "statusHistoryActions";
         const correct = el("button","Виправити реквізити");
