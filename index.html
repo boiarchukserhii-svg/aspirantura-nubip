@@ -171,6 +171,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 }
 
 .scheduledNotice{padding:12px 14px;border:1px solid #bdd7f0;border-radius:10px;background:#edf5ff;color:#215685;font-size:14px;line-height:1.5;margin:12px 0}.scheduledStatus{display:inline-block;color:#805307;background:#fff4d8;border-radius:6px;padding:3px 7px;margin-top:6px}
+.leaveReasonText{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#415a79;background:#f2f6fc;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere}.statusForm #leaveReasonLabel{min-width:0}.statusForm #statusLeaveReason{max-width:100%;text-overflow:ellipsis}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -245,7 +246,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <p id="schedulePreview" class="scheduledNotice" role="status" hidden></p>
 <label>Дата набрання чинності<input id="statusEffective" type="date" required></label>
 <label id="leaveEndLabel" hidden>Академвідпустка до<input id="statusLeaveEnd" type="date"></label>
-<label id="leaveReasonLabel" hidden>Підстава академвідпустки<input id="statusLeaveReason" maxlength="240"></label>
+<label id="leaveReasonLabel" hidden>Причина академічної відпустки<select id="statusLeaveReason"></select><small id="leaveReasonText" class="leaveReasonText" aria-hidden="true" hidden></small></label>
 <label id="studyEndLabel" hidden>Уточнена дата завершення навчання<input id="statusStudyEnd" type="date"></label>
 <label>Номер наказу<input id="statusOrderNumber" maxlength="80" required></label>
 <label>Дата наказу<input id="statusOrderDate" type="date" required></label>
@@ -841,6 +842,22 @@ function renderCalendar() {
   $("emptyLeaveCalendar").hidden = Boolean(leaveRows.length);
   $("emptyStudyCalendar").hidden = Boolean(studyRows.length);
 }
+const academicLeaveReasons = [
+  "За медичними показаннями",
+  "У зв’язку з участю в програмі академічної мобільності",
+  "У зв’язку з призовом на військову службу",
+  "У зв’язку з довгостроковим службовим відрядженням здобувача, який поєднує навчання з роботою",
+  "У зв’язку із сімейними обставинами",
+  "У зв’язку з вагітністю та пологами",
+  "У зв'язку з доглядом за дитиною до досягнення нею трирічного віку",
+  "У зв'язку з доглядом за дитиною до досягнення нею шестирічного, шістнадцятирічного, вісімнадцятирічного віку"
+];
+function populateLeaveReasons(previous = "") {
+  const select = $("statusLeaveReason");
+  select.replaceChildren(new Option("Виберіть причину", ""),...academicLeaveReasons.map(reason => new Option(reason,reason)));
+  if (previous && !academicLeaveReasons.includes(previous)) select.add(new Option(previous,previous));
+  select.value = previous;
+}
 function kyivDay(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(now);
   const value = type => parts.find(part => part.type === type).value;
@@ -901,6 +918,7 @@ function editStatus(record,editingIndex = null) {
     return action.target !== current;
   });
   form.reset();
+  populateLeaveReasons(planned?.reason ?? (current === LEAVE ? record[leaveFields[1]] ?? "" : ""));
   let selectedAction = planned ? options.find(action => action.id === planned.actionId) ?? null : null;
   $("statusActions").replaceChildren(...options.map(action => {
     const button = el("button",action.label);
@@ -918,7 +936,6 @@ function editStatus(record,editingIndex = null) {
   $("statusEffective").removeAttribute("max");
   if (planned) {
     $("statusLeaveEnd").value = planned.leaveEnd ?? "";
-    $("statusLeaveReason").value = planned.reason ?? "";
     $("statusStudyEnd").value = planned.studyEnd ?? "";
     $("statusOrderNumber").value = planned.orderNumber;
     $("statusOrderDate").value = planned.orderDate;
@@ -931,8 +948,10 @@ function editStatus(record,editingIndex = null) {
     const leave = action?.target === LEAVE, extend = action?.id === "extend";
     $("leaveEndLabel").hidden = !leave;
     $("statusLeaveEnd").required = leave;
-    $("leaveReasonLabel").hidden = action?.id !== "leave";
-    $("statusLeaveReason").required = action?.id === "leave";
+    $("leaveReasonLabel").hidden = !leave;
+    $("statusLeaveReason").required = leave;
+    $("leaveReasonText").textContent = $("statusLeaveReason").value;
+    $("leaveReasonText").hidden = !leave || !$("statusLeaveReason").value;
     $("studyEndLabel").hidden = !["resume","studyEnd"].includes(action?.id);
     $("statusStudyEnd").required = action?.id === "studyEnd";
     const effective = $("statusEffective").value;
@@ -952,8 +971,8 @@ function editStatus(record,editingIndex = null) {
       ? "Виберіть іншу дату завершення навчання." : "");
     $("statusOrderNumber").setCustomValidity($("statusOrderNumber").value && !$("statusOrderNumber").value.trim()
       ? "Вкажіть номер наказу." : "");
-    $("statusLeaveReason").setCustomValidity(action?.id === "leave" && $("statusLeaveReason").value && !$("statusLeaveReason").value.trim()
-      ? "Вкажіть підставу академвідпустки." : "");
+    $("statusLeaveReason").setCustomValidity(leave && !$("statusLeaveReason").value.trim()
+      ? "Виберіть причину академічної відпустки." : "");
     return action;
   }
   form.oninput = validate;
@@ -977,7 +996,7 @@ function editStatus(record,editingIndex = null) {
         reason:record[leaveFields[1]] ?? null,studyEnd:record["Завершення навчання"] ?? null}};
     if (action.target === LEAVE) {
       entry.leaveEnd = updated["Статус по"] = $("statusLeaveEnd").value;
-      if (action.id === "leave") entry.reason = updated[leaveFields[1]] = $("statusLeaveReason").value.trim();
+      entry.reason = updated[leaveFields[1]] = $("statusLeaveReason").value.trim();
     }
     if (action.id === "studyEnd") {
       entry.studyEndOnly = true;
