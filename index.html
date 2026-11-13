@@ -170,6 +170,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   #archiveDesktop .archiveCardList{margin-top:0}
 }
 
+.scheduledNotice{padding:12px 14px;border:1px solid #bdd7f0;border-radius:10px;background:#edf5ff;color:#215685;font-size:14px;line-height:1.5;margin:12px 0}.scheduledStatus{display:inline-block;color:#805307;background:#fff4d8;border-radius:6px;padding:3px 7px;margin-top:6px}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -229,6 +230,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="profileHead"><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div><div class="profileActions"><button class="cardClose" id="closeCard">Закрити</button><div class="profileCardNumber"><span>№ картки</span><strong id="profileCardNumber"></strong></div></div></div>
 <div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
 <section class="deadlineBox" id="profileDeadline"></section>
+<section class="scheduledNotice" id="profileScheduled" hidden aria-label="Запланований наказ"></section>
 <section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
 <h3 id="profileDiplomaTitle">Диплом доктора філософії</h3><dl id="profileDiplomaDetails"></dl>
 </section>
@@ -240,6 +242,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <form id="statusForm" class="statusForm">
 <fieldset class="statusActionGroup"><legend>Виберіть дію</legend><div class="filterChoices" id="statusActions"></div></fieldset>
 <p id="promotionPreview" hidden></p>
+<p id="schedulePreview" class="scheduledNotice" role="status" hidden></p>
 <label>Дата набрання чинності<input id="statusEffective" type="date" required></label>
 <label id="leaveEndLabel" hidden>Академвідпустка до<input id="statusLeaveEnd" type="date"></label>
 <label id="leaveReasonLabel" hidden>Підстава академвідпустки<input id="statusLeaveReason" maxlength="240"></label>
@@ -838,9 +841,57 @@ function renderCalendar() {
   $("emptyLeaveCalendar").hidden = Boolean(leaveRows.length);
   $("emptyStudyCalendar").hidden = Boolean(studyRows.length);
 }
-function editStatus(record) {
+function kyivDay(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(now);
+  const value = type => parts.find(part => part.type === type).value;
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+function cancelledHistory(record) {
+  return new Set((record.statusHistory ?? []).filter(entry => Number.isInteger(entry.undoOf)).map(entry => entry.undoOf));
+}
+function pendingScheduled(record,day = kyivDay()) {
+  const cancelled = cancelledHistory(record), applied = new Set(record.appliedScheduleIds ?? []);
+  const index = (record.statusHistory ?? []).findIndex((entry,index) => entry.scheduled === true && entry.date > day
+    && !cancelled.has(index) && !applied.has(entry.scheduleId));
+  return index < 0 ? null : {index,entry:record.statusHistory[index]};
+}
+function applyScheduledOrders(record,day = kyivDay()) {
+  const cancelled = cancelledHistory(record), applied = new Set(record.appliedScheduleIds ?? []);
+  const due = (record.statusHistory ?? []).map((entry,index) => ({entry,index}))
+    .filter(({entry,index}) => entry.scheduled === true && entry.date <= day && !cancelled.has(index) && !applied.has(entry.scheduleId))
+    .sort((a,b) => a.entry.date.localeCompare(b.entry.date) || a.index-b.index);
+  if (!due.length) return record;
+  const updated = {...record};
+  for (const {entry} of due) {
+    updated["Контингент"] = entry.to;
+    if (entry.leaveEnd) updated["Статус по"] = entry.leaveEnd;
+    if (entry.reason) updated[leaveFields[1]] = entry.reason;
+    if (entry.studyEnd) updated["Завершення навчання"] = entry.studyEnd;
+    if (Number.isInteger(entry.courseTo)) updated["Курс"] = entry.courseTo;
+    applied.add(entry.scheduleId);
+  }
+  updated.appliedScheduleIds = [...applied];
+  return updated;
+}
+async function cancelScheduledOrder(record,index,button) {
+  if (!canEdit() || pendingScheduled(record)?.index !== index) return;
+  if (!confirm("Скасувати запланований наказ? Поточний статус залишиться без змін.")) return;
+  const entry = record.statusHistory[index];
+  const updated = {...record,statusHistory:[...record.statusHistory,{action:"Запланований наказ скасовано",date:kyivDay(),
+    orderNumber:entry.orderNumber,orderDate:entry.orderDate,undoOf:index}]};
+  button.disabled = true;
+  try { await saveHistoryEdit(record,updated,"Запланований наказ скасовано."); }
+  catch (error) { alert(sync.api?.errorText(error) ?? error.message); }
+  finally { button.disabled = false; }
+}
+function editStatus(record,editingIndex = null) {
   if (!canEdit() || record.diploma) return;
+  const pending = pendingScheduled(record);
+  if (editingIndex === null && pending) editingIndex = pending.index;
+  const planned = editingIndex === null ? null : record.statusHistory?.[editingIndex];
+  if (planned && pending?.index !== editingIndex) { alert("Цей наказ уже набрав чинності або скасований. Відкрийте картку повторно."); return; }
   const dialog = $("statusDialog"), form = $("statusForm");
+  $("statusTitle").textContent = planned ? "Редагувати запланований наказ" : "Змінити статус";
   const current = record["Контингент"];
   const course = Number(record["Курс"]);
   const options = statusActions.filter(action => {
@@ -850,11 +901,11 @@ function editStatus(record) {
     return action.target !== current;
   });
   form.reset();
-  let selectedAction = null;
+  let selectedAction = planned ? options.find(action => action.id === planned.actionId) ?? null : null;
   $("statusActions").replaceChildren(...options.map(action => {
     const button = el("button",action.label);
     button.type = "button";
-    button.setAttribute("aria-pressed","false");
+    button.setAttribute("aria-pressed",String(action === selectedAction));
     button.onclick = () => {
       selectedAction = action;
       for (const choice of $("statusActions").children) choice.setAttribute("aria-pressed",String(choice === button));
@@ -862,10 +913,16 @@ function editStatus(record) {
     };
     return button;
   }));
-  const now = new Date();
-  const today = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  $("statusEffective").value = today;
-  $("statusEffective").max = today;
+  const today = kyivDay();
+  $("statusEffective").value = planned?.date ?? today;
+  $("statusEffective").removeAttribute("max");
+  if (planned) {
+    $("statusLeaveEnd").value = planned.leaveEnd ?? "";
+    $("statusLeaveReason").value = planned.reason ?? "";
+    $("statusStudyEnd").value = planned.studyEnd ?? "";
+    $("statusOrderNumber").value = planned.orderNumber;
+    $("statusOrderDate").value = planned.orderDate;
+  }
   function validate() {
     const action = selectedAction;
     $("saveStatus").disabled = !action;
@@ -879,6 +936,10 @@ function editStatus(record) {
     $("studyEndLabel").hidden = !["resume","studyEnd"].includes(action?.id);
     $("statusStudyEnd").required = action?.id === "studyEnd";
     const effective = $("statusEffective").value;
+    $("schedulePreview").hidden = !action || !effective;
+    $("schedulePreview").textContent = effective > kyivDay()
+      ? `Заплановано з ${formatDate(effective)}. До цієї дати поточний статус, курс і строки навчання зберігатимуться.`
+      : "Наказ набирає чинності одразу після збереження.";
     const until = $("statusLeaveEnd").value;
     $("statusLeaveEnd").setCustomValidity(leave && until && (until < effective || (extend && until <= (record["Статус по"] ?? "")))
       ? "Вкажіть дату завершення, що відповідає періоду відпустки. Для продовження вона має бути пізнішою за чинну дату." : "");
@@ -909,8 +970,8 @@ function editStatus(record) {
       return;
     }
     const target = action.id === "studyEnd" ? current : action.target;
-    const updated = {...record,"Контингент":target,manualStatus:true};
-    const entry = {action:action.label,from:current,to:target,date:$("statusEffective").value,
+    let updated = {...record,"Контингент":target,manualStatus:true};
+    const entry = {action:action.label,actionId:action.id,from:current,to:target,date:$("statusEffective").value,
       orderNumber:$("statusOrderNumber").value.trim(),orderDate:$("statusOrderDate").value,
       previous:{status:current,leaveEnd:record["Статус по"] ?? null,
         reason:record[leaveFields[1]] ?? null,studyEnd:record["Завершення навчання"] ?? null}};
@@ -928,6 +989,7 @@ function editStatus(record) {
     if (action.id === "promote") {
       const history = record.statusHistory ?? [];
       const duplicate = history.some((past,index) => {
+        if (index === editingIndex) return false;
         if (!Number.isInteger(past.courseTo) || history.some(item => item.undoOf === index)) return false;
         const order = history.findLast(item => item.correctionOf === index) ?? past;
         return [past,order].some(item => item.orderNumber === entry.orderNumber && item.orderDate === entry.orderDate);
@@ -940,12 +1002,22 @@ function editStatus(record) {
       entry.courseTo = updated["Курс"] = course+1;
       entry.action = "Переведено на наступний рік навчання";
     }
-    updated.statusHistory = [...(record.statusHistory ?? []),entry];
+    const scheduled = entry.date > kyivDay() || Boolean(planned);
+    if (scheduled) {
+      entry.scheduled = true;
+      entry.scheduleId = planned?.scheduleId ?? crypto.randomUUID();
+      if (planned) entry.revisions = [...(planned.revisions ?? []),Object.fromEntries(Object.entries(planned).filter(([key]) => key !== "revisions"))];
+      updated = {...record,manualStatus:true};
+    }
+    updated.statusHistory = [...(record.statusHistory ?? [])];
+    if (planned) updated.statusHistory[editingIndex] = entry;
+    else updated.statusHistory.push(entry);
     form.dataset.saving = "true";
     $("saveStatus").disabled = $("cancelStatus").disabled = true;
     try {
       const saved = await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
-      showNotice(saved ? "Статус картки збережено." : "Статус змінено у вкладці. Збережіть копію реєстру.",!saved);
+      showNotice(saved ? (entry.date > kyivDay() ? "Запланований наказ збережено. Поточний статус не змінено." : "Статус картки збережено.")
+        : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
     } catch (error) {
       alert(sync.api?.errorText(error) ?? error.message);
       return;
@@ -970,7 +1042,7 @@ async function saveHistoryEdit(record,updated,message = "Історію карт
 }
 let selectedProfile = null;
 function canEditDiploma(record) {
-  return !record.diploma && [ACTIVE,LEAVE].includes(record["Контингент"]);
+  return !record.diploma && !pendingScheduled(record) && [ACTIVE,LEAVE].includes(record["Контингент"]);
 }
 function editDiploma(record) {
   if (!canEdit() || !canEditDiploma(record)) return;
@@ -1075,7 +1147,7 @@ function canRemoveDismissal(record,index) {
   const previous = entry?.previous?.status ?? entry?.from;
   const following = history.slice(index+1);
   const cancelled = following.some(item => item.undoOf === index);
-  return entry?.to === DISMISSED && record["Контингент"] === (cancelled ? previous : DISMISSED)
+  return !entry?.scheduled && entry?.to === DISMISSED && record["Контингент"] === (cancelled ? previous : DISMISSED)
     && statuses.includes(previous) && previous !== DISMISSED
     && !Number.isInteger(entry.correctionOf) && !Number.isInteger(entry.undoOf)
     && following.every(item => item.correctionOf === index || item.undoOf === index);
@@ -1110,6 +1182,7 @@ async function removeDismissal(record,index,button) {
 }
 
 function openCard(selected) {
+  selected = cards.find(card => card["ID картки"] === selected["ID картки"]) ?? applyScheduledOrders(selected);
   const isArchived = card => [COMPLETED,DISMISSED].includes(card["Контингент"]);
   const related = cards.filter(card => card["ID ФО"] === selected["ID ФО"])
     .sort((a,b) => Number(isArchived(a))-Number(isArchived(b)));
@@ -1153,6 +1226,9 @@ function openCard(selected) {
       deadline.append(el("p","Дату завершення навчання потрібно звірити з наказом."));
     }
     $("changeStatus").onclick = () => editStatus(record);
+    const pending = pendingScheduled(record);
+    $("profileScheduled").hidden = !pending;
+    $("profileScheduled").textContent = pending ? `Заплановано: ${pending.entry.action}. Набрання чинності — ${formatDate(pending.entry.date)}. Поточний статус до цієї дати не змінюється.` : "";
     selectedProfile = record;
     updateProfileActions();
     $("editDiploma").onclick = () => editDiploma(record);
@@ -1175,7 +1251,7 @@ function openCard(selected) {
       } else if (Number.isInteger(entry.undoOf)) cancelled.add(entry.undoOf);
       else original.push({entry,index});
     });
-    const latest = original.findLast(item => !cancelled.has(item.index))?.index;
+    const latest = original.findLast(item => !cancelled.has(item.index) && pending?.index !== item.index)?.index;
     entries.append(...original.reverse().map(({entry,index}) => {
       const item = el("li");
       const changes = corrections.get(index) ?? [], order = changes.at(-1) ?? entry;
@@ -1193,6 +1269,12 @@ function openCard(selected) {
       if (entry.studyEndOnly) item.append(el("div","Попередня дата · "+formatDate(entry.previous?.studyEnd)));
        if (entry.studyEnd) item.append(el("div",`Завершення навчання ${formatDate(entry.studyEnd)}`));
       if (Number.isInteger(entry.courseTo)) item.append(el("div",`${entry.courseFrom} курс → ${entry.courseTo} курс`));
+      if (entry.scheduled && !cancelled.has(index)) item.append(el("strong",pending?.index === index ? "Заплановано" : "Набрав чинності",pending?.index === index ? "scheduledStatus" : ""));
+      if (entry.revisions?.length) {
+        const versions = el("details"); versions.append(el("summary","Попередні версії запланованого наказу"),...entry.revisions.map(version =>
+          el("div",`${version.action} · з ${formatDate(version.date)} · наказ № ${version.orderNumber} від ${formatDate(version.orderDate)}`)));
+        item.append(versions);
+      }
       if (cancelled.has(index)) {
         const marker = el("strong","Скасовано");
         marker.className = "cancelledStatus";
@@ -1205,6 +1287,13 @@ function openCard(selected) {
           actions.append(remove);
           item.append(actions);
         }
+      } else if (pending?.index === index && canEdit()) {
+        const actions = el("div"); actions.className = "statusHistoryActions";
+        const edit = el("button","Редагувати запланований наказ"), cancel = el("button","Скасувати запланований наказ");
+        edit.type = cancel.type = "button";
+        edit.onclick = () => editStatus(record,index);
+        cancel.onclick = () => cancelScheduledOrder(record,index,cancel);
+        actions.append(edit,cancel); item.append(actions);
       } else if (canEdit()) {
         const actions = el("div"); actions.className = "statusHistoryActions";
         const correct = el("button","Виправити реквізити");
@@ -1213,7 +1302,7 @@ function openCard(selected) {
         actions.append(correct);
         const restorable = statuses.includes(entry.previous?.status ?? entry.from)
           && (entry.previous || (!entry.leaveEnd && !entry.studyEnd));
-        if (index === latest && entry.to === currentStatus && restorable) {
+        if (!pending && index === latest && entry.to === currentStatus && restorable) {
           const undo = el("button","Скасувати останню зміну");
           undo.type = "button";
           undo.onclick = () => undoStatus(record,index,entry,order,undo);
@@ -1302,7 +1391,7 @@ function openNewCard() {
   dialog.showModal();
 }
 function setCards(next,reset = false) {
-  cards = next.map(card => card["Джерело фінансування"] === "Проектна аспірантура"
+  cards = next.map(card => applyScheduledOrders(card)).map(card => card["Джерело фінансування"] === "Проектна аспірантура"
     ? {...card,"Джерело фінансування":"Проєктна аспірантура"} : card);
   if (reset) filters.clear();
   else pruneFilters(filters);
@@ -1473,6 +1562,7 @@ async function setupSync() {
   }
 }
 function mergeCards(incoming,preserveManual,protectHistory = false) {
+  incoming = incoming.map(card => applyScheduledOrders(card));
   const merged = new Map(cards.map(card => [card["ID картки"],card]));
   for (const card of incoming) {
     const key = card["ID картки"], old = merged.get(key);
@@ -1492,6 +1582,7 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
       const history = old.statusHistory ?? [];
       const updated = {...incomingCard,"Контингент":old["Контингент"],manualStatus:true};
       if (history.length) updated.statusHistory = history;
+      updated.appliedScheduleIds = old.appliedScheduleIds ?? [];
       if (history.some(entry => entry.leaveEnd)) for (const field of leaveFields) updated[field] = old[field];
       if (history.some(entry => entry.studyEnd)) updated["Завершення навчання"] = old["Завершення навчання"];
       if (history.some(entry => Number.isInteger(entry.courseTo))) updated["Курс"] = old["Курс"];
@@ -1518,6 +1609,23 @@ function exportRegistry() {
   const rows = [columns,...cards.map(card => columns.map(field => card[field]))];
   download("Аспіранти НУБіП України.csv","text/csv;charset=utf-8","\ufeff"+rows.map(row => row.map(cell).join(";")).join("\r\n"));
 }
+function validScheduleMetadata(card) {
+  const history = card.statusHistory ?? [], ids = new Set();
+  const validDate = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
+  for (const entry of history) {
+    if (!entry.scheduled) continue;
+    if (entry.scheduled !== true || typeof entry.scheduleId !== "string" || !entry.scheduleId || ids.has(entry.scheduleId)
+      || !validDate(entry.date) || !statuses.includes(entry.to) || !statuses.includes(entry.previous?.status)
+      || !statusActions.some(action => action.id === entry.actionId)
+      || (entry.courseTo != null && (!Number.isSafeInteger(entry.courseTo) || !Number.isSafeInteger(entry.courseFrom)))
+      || [entry.studyEnd,entry.leaveEnd].some(value => value != null && !validDate(value))) return false;
+    ids.add(entry.scheduleId);
+  }
+  return card.appliedScheduleIds == null || (Array.isArray(card.appliedScheduleIds)
+    && new Set(card.appliedScheduleIds).size === card.appliedScheduleIds.length
+    && card.appliedScheduleIds.every(id => ids.has(id)));
+}
 function decodeBackup(data) {
   if (!Array.isArray(data) || data.some(card => !card || !statuses.includes(card["Контингент"])
     || !["ID картки","ID ФО"].every(field => Number.isSafeInteger(card[field]) && card[field] > 0)
@@ -1529,6 +1637,7 @@ function decodeBackup(data) {
       (typeof card[field] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(card[field]))))) {
     throw new Error("Цей файл не є копією реєстру «Аспіранти НУБіП України».");
   }
+  if (data.some(card => !validScheduleMetadata(card))) throw Error("Копія містить некоректні відомості про заплановані накази.");
   return data;
 }
 function setup() {
@@ -1668,7 +1777,24 @@ function setup() {
     showNotice("Не вдалося відкрити дані браузера. Імпортуйте Excel або відкрийте копію.",true);
   }
 }
+let scheduleDay = kyivDay();
+function refreshScheduled() {
+  const day = kyivDay();
+  if (day === scheduleDay) return;
+  const previousDay = scheduleDay;
+  scheduleDay = day;
+  if ($("asOf").value === previousDay) $("asOf").value = day;
+  const selectedId = selectedProfile?.["ID картки"];
+  setCards(cards);
+  if ($("card").open && selectedId) {
+    const current = cards.find(card => card["ID картки"] === selectedId);
+    if (current) openCard(current);
+  }
+}
 setup();
+setInterval(refreshScheduled,60000);
+window.addEventListener("focus",refreshScheduled);
+document.addEventListener("visibilitychange",() => { if (!document.hidden) refreshScheduled(); });
 setupSync();
 if (location.protocol === "https:" || location.hostname === "localhost") {
   $("installation").hidden = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
