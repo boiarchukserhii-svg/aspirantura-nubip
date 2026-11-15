@@ -172,6 +172,10 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 
 .scheduledNotice{padding:12px 14px;border:1px solid #bdd7f0;border-radius:10px;background:#edf5ff;color:#215685;font-size:14px;line-height:1.5;margin:12px 0}.scheduledStatus{display:inline-block;color:#805307;background:#fff4d8;border-radius:6px;padding:3px 7px;margin-top:6px}
 .leaveReasonText{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#415a79;background:#f2f6fc;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere}.statusForm #leaveReasonLabel{min-width:0}.statusForm #statusLeaveReason{max-width:100%;text-overflow:ellipsis}
+.supervisorLine{margin:5px 0 0;font-size:13px;font-weight:400;color:#405571;overflow-wrap:anywhere}
+.supervisorFact{grid-column:1/-1}.supervisorFact dd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.editSupervisor{font-size:12px;padding:5px 9px}
+@media(max-width:760px){:is(#registry,#archive) td:nth-child(4){display:block}}
 </style>
 <main>
 <header><div><h1><img class="appMark" src="./icon-192.png" width="36" height="36" alt="">Аспіранти НУБіП України</h1></div>
@@ -238,6 +242,15 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
+<dialog id="supervisorDialog" aria-labelledby="supervisorTitle">
+<h2 id="supervisorTitle">Науковий керівник</h2>
+<form id="supervisorForm" class="statusForm">
+<label>Прізвище, ім’я та по батькові наукового керівника<input id="supervisorName" maxlength="500" placeholder="Ладиченко Віктор Валерійович" autocomplete="off"></label>
+<p>Якщо керівників двоє, розділіть імена крапкою з комою. Залиште поле порожнім, щоб прибрати запис</p>
+<p id="supervisorError" role="alert" hidden></p>
+<div class="statusFormActions"><button type="button" id="cancelSupervisor">Скасувати</button><button type="submit" id="saveSupervisor" class="primary">Зберегти зміни</button></div>
+</form>
+</dialog>
 <dialog id="statusDialog" aria-labelledby="statusTitle">
 <h2 id="statusTitle">Змінити статус</h2>
 <form id="statusForm" class="statusForm">
@@ -284,6 +297,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <label>Курс<input name="course" type="number" min="1" step="1" required></label>
 <label>Структурний підрозділ<input name="department" maxlength="240" required></label>
 <label>Спеціальність<input name="specialty" maxlength="240" required></label>
+<label>Науковий керівник<input name="supervisor" maxlength="500" placeholder="Прізвище, ім’я та по батькові"></label>
 <label>Освітньо-наукова програма<input name="program" maxlength="240" required></label>
 <label>ID ОНП<input name="programId" type="number" min="1" step="1" required></label>
 <fieldset class="newCardChoices wideField"><legend>Форма навчання</legend><div class="filterChoices">
@@ -336,7 +350,7 @@ const leaveStatuses = new Set(["Надано академвідпустку", "�
 const fields = ["ID картки","ID ФО","Здобувач","Дата народження","Курс","Структурний підрозділ","Спеціальність","ID ОП","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання","Початок навчання","Завершення навчання"];
 const leaveFields = ["Статус по","Підстави надання академічної відпустки"];
 const dateFields = new Set(["Дата народження","Початок навчання","Завершення навчання","Статус по"]);
-const filterFields = ["Контингент","Курс","Структурний підрозділ","Спеціальність","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання"];
+const filterFields = ["Контингент","Курс","Структурний підрозділ","Спеціальність","Науковий керівник","Освітня програма","Форма навчання","Джерело фінансування","Статус навчання"];
 const columns = ["Здобувач","Курс","Структурний підрозділ","Спеціальність","Освітня програма","Контингент"];
 const MS_DAY = 86400000;
 const LEAVE_WINDOWS = [7,14,30,60,90];
@@ -503,7 +517,15 @@ const $ = id => document.getElementById(id);
 const collator = new Intl.Collator("uk",{numeric:true,sensitivity:"base"});
 const count = value => value.toLocaleString("uk");
 const formatDate = value => value ? value.split("-").reverse().join(".") : "—";
+function supervisorNames(record) {
+  return [...new Set(String(record["Науковий керівник"] ?? "").split(/[;\n]+/).map(value => value.trim().replace(/\s+/g," ")).filter(Boolean))];
+}
+function filterValues(record,field) {
+  if (field === "Науковий керівник") { const names = supervisorNames(record); return names.length ? names : ["Не зазначено"]; }
+  return [String(display(record,field))];
+}
 function display(record,field) {
+  if (field === "Науковий керівник") return supervisorNames(record).join("; ") || "Не зазначено";
   if (field === "Освітня програма") return record["ID ОП"] && record[field]
     ? `${record[field]} · ${record["ID ОП"]}` : "Потребує уточнення";
   if (dateFields.has(field)) return formatDate(record[field]);
@@ -562,7 +584,7 @@ const filters = new Map();
 const archiveFilters = new Map();
 let draftFilters = new Map();
 let editingArchiveFilters = false;
-const searchableFilters = new Set(["Структурний підрозділ","Спеціальність","Освітня програма"]);
+const searchableFilters = new Set(["Структурний підрозділ","Спеціальність","Освітня програма","Науковий керівник"]);
 const filterLabel = field => field === "Статус навчання" ? "Статус у ЄДЕБО" : field;
 const filterValue = (field,value) => field === "Курс" ? `${value} курс` : value;
 
@@ -577,7 +599,7 @@ function filterOptions(field,selection,archive) {
   const records = sectionCards(archive,true);
   const eligible = records.filter(card => dependencies.every(key => !selection.has(key)
     || String(display(card,key)) === selection.get(key)));
-  return [...new Set(eligible.map(card => String(display(card,field))))].sort(collator.compare);
+  return [...new Set(eligible.flatMap(card => filterValues(card,field)))].sort(collator.compare);
 }
 function pruneFilters(selection,archive = false) {
   for (const field of filterFields) {
@@ -716,6 +738,10 @@ function shortCardRow(record) {
       cell.append(badge);
     } else {
       cell.textContent = display(record,field);
+      if (field === "Спеціальність") {
+        const supervisor = el("p","Науковий керівник – "+display(record,"Науковий керівник"));
+        supervisor.className = "supervisorLine"; cell.append(supervisor);
+      }
     }
     row.append(cell);
   }
@@ -733,7 +759,7 @@ function renderArchive() {
   renderActiveFilters(true);
   const matches = sectionCards(true,!mobile || Boolean(query)).filter(card =>
     String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
-    && [...archiveFilters].every(([field,value]) => value === String(display(card,field))));
+    && [...archiveFilters].every(([field,value]) => filterValues(card,field).includes(value)));
   matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
   const emptyMessage = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
   if (!mobile) {
@@ -770,7 +796,7 @@ function renderRegistry() {
   [...$("metrics").children].forEach((button,index) => button.setAttribute("aria-pressed",String(index === selectedMetric)));
   const matches = sectionCards(false).filter(card => (!group || group.ids.has(card["ID картки"]))
     && String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
-    && [...filters].every(([field,value]) => value === String(display(card,field))));
+    && [...filters].every(([field,value]) => filterValues(card,field).includes(value)));
   const compareNames = (a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач"));
   const groupFields = ["Курс","Структурний підрозділ","Освітня програма"];
   if (group?.grouped) {
@@ -1059,6 +1085,27 @@ async function saveHistoryEdit(record,updated,message = "Історію карт
   showNotice(saved ? message : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
   if ($("card").open) openCard(updated);
 }
+function editSupervisor(record) {
+  if (!canEdit()) return;
+  const dialog = $("supervisorDialog"), form = $("supervisorForm"), input = $("supervisorName"), errorBox = $("supervisorError");
+  input.value = record["Науковий керівник"] ?? "";
+  errorBox.hidden = true;
+  $("saveSupervisor").disabled = $("cancelSupervisor").disabled = false;
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (form.dataset.saving) return;
+    const value = supervisorNames({"Науковий керівник":input.value}).join("; ");
+    if (value.length > 500) { errorBox.textContent = "Скоротіть запис до 500 символів"; errorBox.hidden = false; return; }
+    form.dataset.saving = "true"; errorBox.hidden = true;
+    $("saveSupervisor").disabled = $("cancelSupervisor").disabled = true;
+    try {
+      await saveHistoryEdit(record,{...record,"Науковий керівник":value},"Наукового керівника збережено");
+      dialog.close();
+    } catch (error) { errorBox.textContent = sync.api?.errorText(error) ?? error.message; errorBox.hidden = false; }
+    finally { delete form.dataset.saving; $("saveSupervisor").disabled = $("cancelSupervisor").disabled = false; }
+  };
+  dialog.showModal(); input.focus();
+}
 let selectedProfile = null;
 function canEditDiploma(record) {
   return !record.diploma && !pendingScheduled(record) && [ACTIVE,LEAVE].includes(record["Контингент"]);
@@ -1223,10 +1270,18 @@ function openCard(selected) {
     funding.className = "pill";
     $("profileBadges").replaceChildren(badge,form,funding);
     const factFields = [["Початок навчання","Початок навчання"],["Завершення навчання","Завершення навчання"],
-      ["Спеціальність","Спеціальність"],["Освітня програма","Освітньо-наукова програма"]];
+      ["Спеціальність","Спеціальність"],["Науковий керівник","Науковий керівник"],["Освітня програма","Освітньо-наукова програма"]];
     $("profileFacts").replaceChildren(...factFields.map(([field,label]) => {
       const value = field === "Освітня програма" ? record[field] || "Потребує уточнення" : display(record,field);
-      const fact = el("div"); fact.append(el("dt",label),el("dd",value)); return fact;
+      const fact = el("div"), description = el("dd",value);
+      if (field === "Науковий керівник") {
+        fact.className = "supervisorFact";
+        const edit = el("button",supervisorNames(record).length ? "Змінити" : "Додати");
+        edit.type = "button"; edit.className = "editSupervisor"; edit.hidden = !canEdit();
+        edit.setAttribute("aria-label","Змінити наукового керівника");
+        edit.onclick = () => editSupervisor(record); description.append(edit);
+      }
+      fact.append(el("dt",label),description); return fact;
     }));
     const deadline = $("profileDeadline");
     deadline.hidden = currentStatus === COMPLETED || currentStatus === DISMISSED;
@@ -1384,7 +1439,7 @@ function openNewCard() {
       if (studyEnd < effective) throw Error("Дата завершення навчання має бути в день поновлення або пізніше.");
       const card = {
         "ID картки":cardId,"ID ФО":personId,"Здобувач":value("name"),"Дата народження":null,"Курс":course,
-        "Структурний підрозділ":value("department"),"Спеціальність":value("specialty"),"ID ОП":programId,
+        "Структурний підрозділ":value("department"),"Спеціальність":value("specialty"),"Науковий керівник":supervisorNames({"Науковий керівник":value("supervisor")}).join("; "),"ID ОП":programId,
         "Освітня програма":value("program"),"Форма навчання":value("mode"),"Джерело фінансування":value("funding"),
         "Статус навчання":null,"Початок навчання":effective,"Завершення навчання":studyEnd,
         "Статус по":null,[leaveFields[1]]:null,"Контингент":ACTIVE,manualStatus:true,
@@ -1476,6 +1531,7 @@ function updateSyncControls(message) {
   updateWriteControls();
 }
 function updateProfileActions() {
+  document.querySelectorAll(".editSupervisor").forEach(button => button.hidden = !canEdit());
   const show = canEdit() && selectedProfile !== null && !selectedProfile.diploma;
   $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
   $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
@@ -1489,6 +1545,7 @@ function updateWriteControls() {
 }
 function clearSharedView() {
   selectedProfile = null;
+  $("supervisorDialog").close(); $("supervisorForm").reset();
   $("newCardDialog").close();
   $("newCardForm").reset();
   $("diplomaDialog").close();
@@ -1589,7 +1646,10 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
     if (protectHistory && old?.diploma && card.diploma && JSON.stringify(old.diploma) !== JSON.stringify(card.diploma)) {
       throw Error("Копія містить інші реквізити диплома. Спільний реєстр залишено без змін.");
     }
-    const incomingCard = old?.diploma && (preserveManual || !card.diploma) ? {...card,diploma:old.diploma} : card;
+    let incomingCard = old?.diploma && (preserveManual || !card.diploma) ? {...card,diploma:old.diploma} : card;
+    if (old && Object.hasOwn(old,"Науковий керівник") && (preserveManual || !Object.hasOwn(card,"Науковий керівник"))) {
+      incomingCard = {...incomingCard,"Науковий керівник":old["Науковий керівник"]};
+    }
     if (protectHistory && old?.manualStatus) {
       const before = old.statusHistory ?? [], after = card.statusHistory ?? [];
       if (before.some((entry,index) => JSON.stringify(entry) !== JSON.stringify(after[index]))
@@ -1620,7 +1680,7 @@ function download(name,type,content) {
   setTimeout(() => URL.revokeObjectURL(url),1000);
 }
 function exportRegistry() {
-  const columns = ["Контингент",...fields,...leaveFields];
+  const columns = ["Контингент",...fields.slice(0,7),"Науковий керівник",...fields.slice(7),...leaveFields];
   const cell = value => {
     const text = String(value ?? "");
     return '"'+(/^[\s]*[=+@-]|^[\t\r\n]/.test(text) ? "'" : "")+text.replaceAll('"','""')+'"';
@@ -1650,6 +1710,7 @@ function decodeBackup(data) {
     || !["ID картки","ID ФО"].every(field => Number.isSafeInteger(card[field]) && card[field] > 0)
     || (card.statusHistory != null && (!Array.isArray(card.statusHistory) || card.statusHistory.some(entry =>
       !entry || !["action","date","orderDate","orderNumber"].every(field => typeof entry[field] === "string"))))
+    || (card["Науковий керівник"] != null && (typeof card["Науковий керівник"] !== "string" || card["Науковий керівник"].length > 500))
     || (card.diploma != null && (!["series","number"].every(field => typeof card.diploma[field] === "string" && card.diploma[field].trim())
       || typeof card.diploma.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(card.diploma.date)))
     || [...dateFields].some(field => card[field] != null &&
@@ -1660,6 +1721,8 @@ function decodeBackup(data) {
   return data;
 }
 function setup() {
+  $("cancelSupervisor").onclick = () => $("supervisorDialog").close();
+  $("supervisorDialog").addEventListener("cancel",event => { if ($("saveSupervisor").disabled) event.preventDefault(); });
   $("addCard").onclick = openNewCard;
   $("cancelNewCard").onclick = () => $("newCardDialog").close();
   $("newCardDialog").addEventListener("cancel",event => {
