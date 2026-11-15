@@ -1,4 +1,4 @@
-const CACHE = "aspirantura-nubip-app-v83-supervisor";
+const CACHE = "aspirantura-nubip-app-v84-supervisor-surname";
 const HOME = new URL("./",self.location).href;
 const FONTS = ["Zakon-Regular.otf","Zakon-Bold.otf"].map(name => new URL(name,HOME).href);
 async function refreshPage(request) {

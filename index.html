@@ -524,6 +524,16 @@ function filterValues(record,field) {
   if (field === "Науковий керівник") { const names = supervisorNames(record); return names.length ? names : ["Не зазначено"]; }
   return [String(display(record,field))];
 }
+function supervisorQuery(value) {
+  return String(value ?? "").trim().normalize("NFKC").toLocaleLowerCase("uk").replace(/[’ʼ`]/g,"'").replace(/\s+/g," ");
+}
+function matchesFilter(record,field,value) {
+  if (field === "Науковий керівник") {
+    const query = supervisorQuery(value);
+    return !query || supervisorNames(record).some(name => supervisorQuery(name).split(" ")[0].includes(query));
+  }
+  return filterValues(record,field).includes(value);
+}
 function display(record,field) {
   if (field === "Науковий керівник") return supervisorNames(record).join("; ") || "Не зазначено";
   if (field === "Освітня програма") return record["ID ОП"] && record[field]
@@ -603,6 +613,10 @@ function filterOptions(field,selection,archive) {
 }
 function pruneFilters(selection,archive = false) {
   for (const field of filterFields) {
+    if (field === "Науковий керівник") {
+      if (selection.has(field) && !supervisorQuery(selection.get(field))) selection.delete(field);
+      continue;
+    }
     if (selection.has(field) && !filterOptions(field,selection,archive).includes(selection.get(field))) selection.delete(field);
   }
 }
@@ -617,6 +631,20 @@ function renderFilterPanel() {
     group.open = expanded.has(field) || (!container.children.length && !expanded.size && index === 0);
     const current = draftFilters.get(field);
     group.append(el("summary",filterLabel(field)+(current ? " · "+filterValue(field,current) : "")));
+    if (field === "Науковий керівник") {
+      const search = el("input"), heading = group.querySelector("summary");
+      search.type = "search"; search.maxLength = 120;
+      search.placeholder = "Введіть прізвище";
+      search.value = current ?? "";
+      search.setAttribute("aria-label","Прізвище наукового керівника");
+      search.oninput = () => {
+        const value = search.value.trim();
+        if (value) draftFilters.set(field,value); else draftFilters.delete(field);
+        heading.textContent = filterLabel(field)+(value ? " · "+value : "");
+      };
+      group.append(search,el("p","Введіть прізвище або його частину й натисніть «Застосувати»"));
+      return group;
+    }
     choices.className = searchableFilters.has(field) ? "filterChoices longChoices" : "filterChoices";
     function renderChoices(query = "") {
       const options = filterOptions(field,draftFilters,editingArchiveFilters).filter(value => value.toLocaleLowerCase("uk").includes(query));
@@ -759,7 +787,7 @@ function renderArchive() {
   renderActiveFilters(true);
   const matches = sectionCards(true,!mobile || Boolean(query)).filter(card =>
     String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
-    && [...archiveFilters].every(([field,value]) => filterValues(card,field).includes(value)));
+    && [...archiveFilters].every(([field,value]) => matchesFilter(card,field,value)));
   matches.sort((a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач")));
   const emptyMessage = query || archiveFilters.size ? "За цими умовами карток немає." : "У цій категорії поки немає карток.";
   if (!mobile) {
@@ -796,7 +824,7 @@ function renderRegistry() {
   [...$("metrics").children].forEach((button,index) => button.setAttribute("aria-pressed",String(index === selectedMetric)));
   const matches = sectionCards(false).filter(card => (!group || group.ids.has(card["ID картки"]))
     && String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
-    && [...filters].every(([field,value]) => filterValues(card,field).includes(value)));
+    && [...filters].every(([field,value]) => matchesFilter(card,field,value)));
   const compareNames = (a,b) => collator.compare(display(a,"Здобувач"),display(b,"Здобувач"));
   const groupFields = ["Курс","Структурний підрозділ","Освітня програма"];
   if (group?.grouped) {
