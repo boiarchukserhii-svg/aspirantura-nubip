@@ -956,7 +956,7 @@ async function cancelScheduledOrder(record,index,button) {
   finally { button.disabled = false; }
 }
 function editStatus(record,editingIndex = null) {
-  if (!canEdit() || record.diploma) return;
+  if (!canEdit()) return;
   const pending = pendingScheduled(record);
   if (editingIndex === null && pending) editingIndex = pending.index;
   const planned = editingIndex === null ? null : record.statusHistory?.[editingIndex];
@@ -969,7 +969,7 @@ function editStatus(record,editingIndex = null) {
     if (action.id === "promote") return current === ACTIVE && Number.isSafeInteger(course) && course >= 1 && course < Number.MAX_SAFE_INTEGER;
     if (action.id === "studyEnd") return true;
     if (action.id === "extend") return current === LEAVE;
-    return action.target !== current;
+    return action.id === "complete" || action.target !== current;
   });
   form.reset();
   populateLeaveReasons(planned?.reason ?? (current === LEAVE ? record[leaveFields[1]] ?? "" : ""));
@@ -1136,7 +1136,7 @@ function editSupervisor(record) {
 }
 let selectedProfile = null;
 function canEditDiploma(record) {
-  return !record.diploma && !pendingScheduled(record) && [ACTIVE,LEAVE].includes(record["Контингент"]);
+  return !record.diploma && !pendingScheduled(record) && [ACTIVE,LEAVE,COMPLETED].includes(record["Контингент"]);
 }
 function editDiploma(record) {
   if (!canEdit() || !canEditDiploma(record)) return;
@@ -1560,7 +1560,7 @@ function updateSyncControls(message) {
 }
 function updateProfileActions() {
   document.querySelectorAll(".editSupervisor").forEach(button => button.hidden = !canEdit());
-  const show = canEdit() && selectedProfile !== null && !selectedProfile.diploma;
+  const show = canEdit() && selectedProfile !== null;
   $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
   $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
 }
