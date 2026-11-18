@@ -117,3 +117,26 @@ export function errorText(error) {
   if (["unavailable","auth/network-request-failed"].includes(error?.code)) return "Немає зв’язку зі сховищем. Спробуйте після підключення.";
   return error?.message || "Не вдалося синхронізувати реєстр.";
 }
+
+function workCollection() {
+  if (!isOwner(auth.currentUser)) throw Error("Робочі картки доступні лише власнику.");
+  return collection(database,"workspaces","aspirantura-nubip","workCards");
+}
+
+export function watchWork(receive,fail) {
+  return onSnapshot(workCollection(),{includeMetadataChanges:true},snapshot => {
+    if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites || !isOwner(auth.currentUser)) return;
+    receive(snapshot.docs.map(item => item.data()));
+  },fail);
+}
+
+export function storeWork(data) {
+  const ref = doc(workCollection(),encodeURIComponent(data.cardId));
+  return runTransaction(database,async transaction => {
+    const current = (await transaction.get(ref)).data();
+    if ((current?.revision ?? null) !== data.revision) {
+      throw Error("Справу вже оновлено на іншому пристрої. Закрийте форму й відкрийте її знову.");
+    }
+    transaction.set(ref,{...data,revision:crypto.randomUUID()});
+  });
+}

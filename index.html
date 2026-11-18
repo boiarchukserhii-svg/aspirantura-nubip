@@ -188,7 +188,24 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 
 </section>
 <section class="panel">
-<nav class="toolbar mainNav" aria-label="Розділи"><button id="registryTab" aria-pressed="true">Реєстр</button><button id="calendarTab" aria-pressed="false">Календар строків</button><button id="archiveTab" aria-pressed="false">Архів</button><button id="export" title="Експорт реєстру у CSV для Excel">Експорт</button></nav>
+<nav class="toolbar mainNav" aria-label="Розділи"><button id="registryTab" aria-pressed="true">Реєстр</button><button id="calendarTab" aria-pressed="false">Календар строків</button><button id="archiveTab" aria-pressed="false">Архів</button><button id="workTab" type="button" aria-pressed="false" hidden>У роботі</button><button id="export" title="Експорт реєстру у CSV для Excel">Експорт</button></nav>
+<section id="work" class="calendarSection" aria-label="У роботі" hidden>
+  <h2>У роботі</h2>
+  <p id="workStatus" role="status"></p>
+  <div id="workList"></div>
+</section>
+<dialog id="workDialog" aria-labelledby="workTitle">
+  <form id="workForm">
+    <h2 id="workTitle">Робоча картка</h2>
+    <p id="workPerson"></p>
+    <p><label>Тип справи <select name="kind" required><option value="leave">Академічна відпустка</option><option value="dismissal">Відрахування</option></select></label></p>
+    <p><label>Етап <select name="stage" required><option value="collect">Збір документів</option><option value="draft">Підготовка наказу</option><option value="approval">На погодженні</option><option value="signed">Наказ видано</option></select></label></p>
+    <p><label>Дата наступної дії <input name="nextDate" type="date"></label></p>
+    <p><label>Службова примітка <textarea name="note" maxlength="2000" rows="3"></textarea></label></p>
+    <p id="workError" role="alert"></p>
+    <div class="toolbar"><button type="submit" class="primary">Зберегти</button><button type="button" id="workComplete">Закрити справу</button><button type="button" id="workCancel">Скасувати</button></div>
+  </form>
+</dialog>
 <div class="toolbar" id="installation" hidden><button id="install">Встановити застосунок</button><span id="installHelp" hidden></span></div>
 <div id="registry">
 <div class="metricSelection" id="metricSelection" hidden><strong id="metricSelectionLabel"></strong><button id="clearMetric">Показати всі картки</button></div>
@@ -239,7 +256,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
 <h3 id="profileDiplomaTitle">Диплом доктора філософії</h3><dl id="profileDiplomaDetails"></dl>
 </section>
-<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
+<div class="statusTools" id="profileStatusTools"><button type="button" id="changeStatus" class="primary" aria-haspopup="dialog">Змінити статус</button><button type="button" id="takeWork" hidden>Взяти в роботу</button><button type="button" id="editDiploma" aria-haspopup="dialog">Видати диплом</button></div>
 <details class="profileMore"><summary>Інші відомості</summary><dl id="details"></dl></details>
 </dialog>
 <dialog id="supervisorDialog" aria-labelledby="supervisorTitle">
@@ -1556,12 +1573,14 @@ function updateSyncControls(message) {
   $("syncLogout").disabled = sync.busy;
   $("syncTransfer").hidden = sync.role !== "owner" || sync.revision !== 0 || !localCards().length;
   $("syncTransfer").disabled = sync.busy || !sync.ready;
+  updateWorkAccess();
   updateWriteControls();
 }
 function updateProfileActions() {
   document.querySelectorAll(".editSupervisor").forEach(button => button.hidden = !canEdit());
   const show = canEdit() && selectedProfile !== null;
   $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
+  $("takeWork").hidden = !selectedProfile || !workReady || sync.role !== "owner";
   $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
 }
 function updateWriteControls() {
@@ -1594,7 +1613,7 @@ async function setupSync() {
   try {
     const config = await import("./sync-config.js?v=34");
     if (!config.firebaseConfig) return;
-    const api = sync.api = await import("./sync.js?v=34");
+    const api = sync.api = await import("./sync.js?v=85");
     $("syncTools").hidden = false;
     updateSyncControls("Локальний режим. Увійдіть для синхронізації.");
     $("syncLogin").onclick = async () => {
@@ -1826,9 +1845,10 @@ function setup() {
     };
   }
   $("archiveSearch").oninput = renderArchive;
-  const sections = ["registry","calendar","archive"];
+  const sections = ["registry","calendar","archive","work"];
   for (const name of sections) {
     $(name+"Tab").onclick = () => {
+      if (name === "work" && sync.role !== "owner") return;
       if (mobile.matches && name !== "registry") $("registryList").open = false;
       if (mobile.matches && name !== "calendar") {
         for (const block of calendarBlocks) block.open = false;
@@ -1839,6 +1859,7 @@ function setup() {
         $(section+"Tab").setAttribute("aria-pressed",section === name);
       }
       if (name === "archive") renderArchive();
+      if (name === "work") renderWork();
     };
   }
   $("pick").onclick = () => $("files").click();
@@ -1901,7 +1922,123 @@ function refreshScheduled() {
     if (current) openCard(current);
   }
 }
+let workRows = new Map();
+let workReady = false;
+let workUid = null;
+let workStop;
+let workDraft;
+const workLabels = {leave:"Академічна відпустка",dismissal:"Відрахування",
+  collect:"Збір документів",draft:"Підготовка наказу",approval:"На погодженні",signed:"Наказ видано"};
+
+function updateWorkAccess() {
+  const uid = sync.role === "owner" ? sync.uid : null;
+  $("workTab").hidden = !uid;
+  if (uid === workUid) return;
+  workStop?.();
+  workStop = undefined;
+  workUid = uid;
+  workReady = false;
+  workRows.clear();
+  workDraft = undefined;
+  $("workDialog").close();
+  $("workForm").reset();
+  $("workPerson").textContent = $("workError").textContent = "";
+  $("workList").replaceChildren();
+  if (!uid) {
+    if (!$("work").hidden) $("registryTab").click();
+    return;
+  }
+  $("workStatus").textContent = "Завантажуємо робочі картки…";
+  workStop = sync.api.watchWork(rows => {
+    if (workUid !== uid) return;
+    workRows = new Map(rows.map(row => [row.cardId,row]));
+    workReady = true;
+    renderWork();
+    updateProfileActions();
+  }, error => {
+    if (workUid !== uid) return;
+    workRows.clear();
+    workReady = false;
+    $("workDialog").close();
+    $("workForm").reset();
+    workDraft = undefined;
+    $("workPerson").textContent = $("workError").textContent = "";
+    $("workList").replaceChildren();
+    $("workStatus").textContent = sync.api.errorText(error);
+    updateProfileActions();
+  });
+}
+
+function renderWork() {
+  if (!workReady || sync.role !== "owner") return;
+  const rows = [...workRows.values()].filter(row => !row.closed)
+    .sort((a,b) => (a.nextDate || "9999").localeCompare(b.nextDate || "9999") || collator.compare(a.person,b.person));
+  $("workStatus").textContent = rows.length ? "" : "Справ у роботі поки немає. Щоб додати справу, відкрийте картку здобувача й натисніть «Взяти в роботу».";
+  $("workList").replaceChildren(...rows.map(row => {
+    const item = document.createElement("article");
+    const title = document.createElement("h3");
+    const details = document.createElement("p");
+    const edit = document.createElement("button");
+    title.textContent = row.person;
+    details.textContent = [workLabels[row.kind],workLabels[row.stage],row.nextDate,row.note].filter(Boolean).join(" · ");
+    edit.type = "button";
+    edit.textContent = "Редагувати справу";
+    edit.onclick = () => openWork(row.cardId,row.person);
+    item.append(title,details,edit,document.createElement("hr"));
+    return item;
+  }));
+}
+
+function openWork(cardId,person) {
+  if (!cardId || !workReady || sync.role !== "owner") return;
+  const row = workRows.get(cardId);
+  const active = row && !row.closed;
+  workDraft = {cardId,person,revision:row?.revision ?? null};
+  $("workPerson").textContent = person;
+  $("workError").textContent = "";
+  const fields = $("workForm").elements;
+  fields.kind.value = active ? row.kind : "leave";
+  fields.stage.value = active ? row.stage : "collect";
+  fields.nextDate.value = active ? row.nextDate : "";
+  fields.note.value = active ? row.note : "";
+  $("workComplete").hidden = !active;
+  $("workDialog").showModal();
+}
+
+async function saveWork(closed) {
+  const draft = workDraft;
+  if (!draft || !workReady || sync.role !== "owner") return;
+  const form = $("workForm");
+  const fields = new FormData(form);
+  const buttons = [...form.querySelectorAll("button")];
+  buttons.forEach(button => button.disabled = true);
+  try {
+    await sync.api.storeWork({...draft, kind:fields.get("kind"),stage:fields.get("stage"),
+      nextDate:fields.get("nextDate"),note:fields.get("note").trim(),closed});
+    if (workDraft !== draft) return;
+    $("workDialog").close();
+    $("card").close();
+    $("workTab").click();
+  } catch (error) {
+    if (workDraft === draft) $("workError").textContent = sync.api.errorText(error);
+  } finally {
+    buttons.forEach(button => button.disabled = false);
+  }
+}
+
 setup();
+$("takeWork").onclick = () => {
+  if (selectedProfile) openWork(selectedProfile["ID картки"],display(selectedProfile,"Здобувач"));
+};
+$("workForm").onsubmit = event => { event.preventDefault(); saveWork(false); };
+$("workComplete").onclick = () => saveWork(true);
+$("workCancel").onclick = () => $("workDialog").close();
+$("workDialog").addEventListener("close", () => {
+  if ($("workDialog").open) return;
+  workDraft = undefined;
+  $("workForm").reset();
+  $("workPerson").textContent = $("workError").textContent = "";
+});
 setInterval(refreshScheduled,60000);
 window.addEventListener("focus",refreshScheduled);
 document.addEventListener("visibilitychange",() => { if (!document.hidden) refreshScheduled(); });
