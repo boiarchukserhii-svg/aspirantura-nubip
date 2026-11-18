@@ -172,6 +172,11 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 
 .scheduledNotice{padding:12px 14px;border:1px solid #bdd7f0;border-radius:10px;background:#edf5ff;color:#215685;font-size:14px;line-height:1.5;margin:12px 0}.scheduledStatus{display:inline-block;color:#805307;background:#fff4d8;border-radius:6px;padding:3px 7px;margin-top:6px}
 .leaveReasonText{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#415a79;background:#f2f6fc;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere}.statusForm #leaveReasonLabel{min-width:0}.statusForm #statusLeaveReason{max-width:100%;text-overflow:ellipsis}
+#workList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.workCard{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:12px;border:1px solid #dce6f1;border-radius:10px;background:#fff;overflow-wrap:anywhere}
+.workCard h3,.workCard p{margin:0}
+.workCard button{margin-top:auto;max-width:100%;white-space:normal}
+@media(max-width:480px){#workList{gap:7px}.workCard{padding:8px}.workCard h3{font-size:14px}.workCard p,.workCard button{font-size:12px}}
 .workCountdown{font-weight:700;color:#234d80}
 .workCountdown[data-urgent="true"]{color:#963a24}
 .doubleSupervision{display:inline-block;margin:4px 6px 0 0;padding:3px 8px;border-radius:8px;background:#e9f1fc;color:#234d80;font-size:12px;font-weight:700;line-height:1.35}
@@ -2009,8 +2014,9 @@ function renderWork() {
     const title = document.createElement("h3");
     const details = document.createElement("p");
     const edit = document.createElement("button");
+    item.className = "workCard";
     title.textContent = row.person;
-    details.textContent = [workLabels[row.kind],workLabels[row.stage],row.nextDate,row.note].filter(Boolean).join(" · ");
+    details.textContent = [workLabels[row.kind],workLabels[row.stage],row.nextDate].filter(Boolean).join(" · ");
     edit.type = "button";
     edit.textContent = "Редагувати справу";
     edit.onclick = () => openWork(row.cardId,row.person);
@@ -2021,7 +2027,7 @@ function renderWork() {
       : `До наступної дії · ${workDayCount.format(days)}`);
     countdown.className = "workCountdown";
     countdown.dataset.urgent = days !== null && days <= workReminderDays;
-    item.append(title,details,countdown,edit,document.createElement("hr"));
+    item.append(title,details,countdown,edit);
     return item;
   }));
 }
