@@ -172,6 +172,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 
 .scheduledNotice{padding:12px 14px;border:1px solid #bdd7f0;border-radius:10px;background:#edf5ff;color:#215685;font-size:14px;line-height:1.5;margin:12px 0}.scheduledStatus{display:inline-block;color:#805307;background:#fff4d8;border-radius:6px;padding:3px 7px;margin-top:6px}
 .leaveReasonText{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#415a79;background:#f2f6fc;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere}.statusForm #leaveReasonLabel{min-width:0}.statusForm #statusLeaveReason{max-width:100%;text-overflow:ellipsis}
+.workCountdown{font-weight:700;color:#234d80}
+.workCountdown[data-urgent="true"]{color:#963a24}
 .doubleSupervision{display:inline-block;margin:4px 6px 0 0;padding:3px 8px;border-radius:8px;background:#e9f1fc;color:#234d80;font-size:12px;font-weight:700;line-height:1.35}
 .supervisorLine{margin:5px 0 0;font-size:13px;font-weight:400;color:#405571;overflow-wrap:anywhere}
 .supervisorFact{grid-column:1/-1}.supervisorFact dd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -1923,6 +1925,7 @@ function refreshScheduled() {
   if (day === scheduleDay) return;
   const previousDay = scheduleDay;
   scheduleDay = day;
+  renderWork();
   if ($("asOf").value === previousDay) $("asOf").value = day;
   const selectedId = selectedProfile?.["ID картки"];
   setCards(cards);
@@ -1953,6 +1956,7 @@ function updateWorkAccess() {
   $("workForm").reset();
   $("workPerson").textContent = $("workError").textContent = "";
   $("workList").replaceChildren();
+  $("workTab").textContent = "У роботі";
   if (!uid) {
     if (!$("work").hidden) $("registryTab").click();
     return;
@@ -1973,16 +1977,33 @@ function updateWorkAccess() {
     workDraft = undefined;
     $("workPerson").textContent = $("workError").textContent = "";
     $("workList").replaceChildren();
+    $("workTab").textContent = "У роботі";
     $("workStatus").textContent = sync.api.errorText(error);
     updateProfileActions();
   });
+}
+
+const workReminderDays = 3;
+const workDayCount = new Intl.NumberFormat("uk",{style:"unit",unit:"day",unitDisplay:"long"});
+
+function workDaysUntil(date,today) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) return null;
+  const end = Date.parse(date);
+  if (!Number.isFinite(end) || new Date(end).toISOString().slice(0,10) !== date) return null;
+  return (end - Date.parse(today)) / 86400000;
 }
 
 function renderWork() {
   if (!workReady || sync.role !== "owner") return;
   const rows = [...workRows.values()].filter(row => !row.closed)
     .sort((a,b) => (a.nextDate || "9999").localeCompare(b.nextDate || "9999") || collator.compare(a.person,b.person));
-  $("workStatus").textContent = rows.length ? "" : "Справ у роботі поки немає. Щоб додати справу, відкрийте картку здобувача й натисніть «Взяти в роботу».";
+  const today = kyivDay();
+  const reminders = rows.filter(row => {
+    const days = workDaysUntil(row.nextDate,today);
+    return days !== null && days <= workReminderDays;
+  }).length;
+  $("workTab").textContent = reminders ? `У роботі (${reminders})` : "У роботі";
+  $("workStatus").textContent = rows.length ? (reminders ? `Нагадування · справ до уваги: ${reminders}` : "") : "Справ у роботі поки немає. Щоб додати справу, відкрийте картку здобувача й натисніть «Взяти в роботу».";
   $("workList").replaceChildren(...rows.map(row => {
     const item = document.createElement("article");
     const title = document.createElement("h3");
@@ -1993,7 +2014,14 @@ function renderWork() {
     edit.type = "button";
     edit.textContent = "Редагувати справу";
     edit.onclick = () => openWork(row.cardId,row.person);
-    item.append(title,details,edit,document.createElement("hr"));
+    const days = workDaysUntil(row.nextDate,today);
+    const countdown = el("p",days === null ? "Дату наступної дії не зазначено"
+      : days < 0 ? `Прострочено · ${workDayCount.format(-days)}`
+      : days === 0 ? "Наступна дія сьогодні"
+      : `До наступної дії · ${workDayCount.format(days)}`);
+    countdown.className = "workCountdown";
+    countdown.dataset.urgent = days !== null && days <= workReminderDays;
+    item.append(title,details,countdown,edit,document.createElement("hr"));
     return item;
   }));
 }
