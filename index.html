@@ -2076,6 +2076,16 @@ async function saveWork(closed) {
 }
 
 setup();
+const mobileExportLayout = matchMedia("(max-width:760px)");
+function placeExportButton() {
+  if (mobileExportLayout.matches) {
+    $("syncStatus").after($("export"));
+  } else {
+    document.querySelector(".mainNav").append($("export"));
+  }
+}
+placeExportButton();
+mobileExportLayout.addEventListener("change",placeExportButton);
 $("takeWork").onclick = () => {
   if (selectedProfile) openWork(selectedProfile["ID картки"],display(selectedProfile,"Здобувач"));
 };
@@ -2115,3 +2125,4 @@ if (location.protocol === "https:" || location.hostname === "localhost") {
 }
 </script>
 </html>
+
