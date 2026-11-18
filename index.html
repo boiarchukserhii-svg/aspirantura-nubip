@@ -177,8 +177,8 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 .workCard h3,.workCard p{margin:0}
 .workCard button{margin-top:auto;max-width:100%;white-space:normal}
 @media(max-width:480px){#workList{gap:7px}.workCard{padding:8px}.workCard h3{font-size:14px}.workCard p,.workCard button{font-size:12px}}
-.workCountdown{font-weight:700;color:#234d80}
-.workCountdown[data-urgent="true"]{color:#963a24}
+.workCard .countdown{width:100%;margin-top:0}
+.workCard .countdown[data-urgent="true"] strong{color:#963a24}
 .doubleSupervision{display:inline-block;margin:4px 6px 0 0;padding:3px 8px;border-radius:8px;background:#e9f1fc;color:#234d80;font-size:12px;font-weight:700;line-height:1.35}
 .supervisorLine{margin:5px 0 0;font-size:13px;font-weight:400;color:#405571;overflow-wrap:anywhere}
 .supervisorFact{grid-column:1/-1}.supervisorFact dd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -571,7 +571,7 @@ function el(tag,text) {
   if (text != null) node.textContent = text;
   return node;
 }
-function countdown(days,study = null) {
+function countdown(days,study = null,todayLabel = null) {
   const box = el("div"), bar = el("progress"), ticks = el("div");
   box.className = "countdown";
   const max = study?.[0].days ?? 90;
@@ -580,7 +580,7 @@ function countdown(days,study = null) {
   const amount = Math.abs(days), last = amount % 10, teens = amount % 100 >= 11 && amount % 100 <= 14;
   const unit = !teens && last === 1 ? "день" : !teens && last >= 2 && last <= 4 ? "дні" : "днів";
   const label = days < 0 ? `Прострочено на ${amount} ${unit}`
-    : days === 0 ? (study ? "Навчання завершується сьогодні" : "Відпустка закінчується сьогодні")
+    : days === 0 ? (todayLabel ?? (study ? "Навчання завершується сьогодні" : "Відпустка закінчується сьогодні"))
     : `${unit === "день" ? "Залишився" : "Залишилося"} ${amount} ${unit}`;
   bar.max = max;
   bar.value = Math.max(0,Math.min(max,max-days));
@@ -1990,7 +1990,6 @@ function updateWorkAccess() {
 }
 
 const workReminderDays = 3;
-const workDayCount = new Intl.NumberFormat("uk",{style:"unit",unit:"day",unitDisplay:"long"});
 
 function workDaysUntil(date,today) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) return null;
@@ -2022,13 +2021,10 @@ function renderWork() {
     edit.textContent = "Редагувати справу";
     edit.onclick = () => openWork(row.cardId,row.person);
     const days = workDaysUntil(row.nextDate,today);
-    const countdown = el("p",days === null ? "Дату наступної дії не зазначено"
-      : days < 0 ? `Прострочено · ${workDayCount.format(-days)}`
-      : days === 0 ? "Наступна дія сьогодні"
-      : `До наступної дії · ${workDayCount.format(days)}`);
-    countdown.className = "workCountdown";
-    countdown.dataset.urgent = days !== null && days <= workReminderDays;
-    item.append(title,details,countdown,edit);
+    const deadline = days === null ? el("p","Дату наступної дії не зазначено")
+      : countdown(days,null,"Наступна дія сьогодні");
+    if (days !== null) deadline.dataset.urgent = days <= workReminderDays;
+    item.append(title,details,deadline,edit);
     return item;
   }));
 }
