@@ -1,4 +1,4 @@
-const CACHE = "aspirantura-nubip-app-v86-mobile-export";
+const CACHE = "aspirantura-nubip-app-v87-mobile-work";
 const HOME = new URL("./",self.location).href;
 const FONTS = ["Zakon-Regular.otf","Zakon-Bold.otf"].map(name => new URL(name,HOME).href);
 async function refreshPage(request) {
@@ -37,4 +37,5 @@ self.addEventListener("fetch",event => {
   event.respondWith(refreshPage(event.request).catch(async () =>
     (await caches.match(HOME,{cacheName:CACHE})) ?? Response.error()));
 });
+
 
