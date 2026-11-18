@@ -172,6 +172,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 
 .scheduledNotice{padding:12px 14px;border:1px solid #bdd7f0;border-radius:10px;background:#edf5ff;color:#215685;font-size:14px;line-height:1.5;margin:12px 0}.scheduledStatus{display:inline-block;color:#805307;background:#fff4d8;border-radius:6px;padding:3px 7px;margin-top:6px}
 .leaveReasonText{display:block;font-size:13px;line-height:1.5;font-weight:400;color:#415a79;background:#f2f6fc;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere}.statusForm #leaveReasonLabel{min-width:0}.statusForm #statusLeaveReason{max-width:100%;text-overflow:ellipsis}
+.doubleSupervision{display:inline-block;margin:4px 6px 0 0;padding:3px 8px;border-radius:8px;background:#e9f1fc;color:#234d80;font-size:12px;font-weight:700;line-height:1.35}
 .supervisorLine{margin:5px 0 0;font-size:13px;font-weight:400;color:#405571;overflow-wrap:anywhere}
 .supervisorFact{grid-column:1/-1}.supervisorFact dd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .editSupervisor{font-size:12px;padding:5px 9px}
@@ -770,6 +771,12 @@ function nameButton(record) {
   button.onclick = () => openCard(record);
   return button;
 }
+function appendDoubleSupervision(container,record) {
+  if (supervisorNames(record).length !== 2) return;
+  const badge = el("span","Подвійне керівництво");
+  badge.className = "doubleSupervision";
+  container.append(badge);
+}
 function shortCardRow(record) {
   const row = el("tr");
   for (const field of columns) {
@@ -786,6 +793,7 @@ function shortCardRow(record) {
       if (field === "Спеціальність") {
         const supervisor = el("p","Науковий керівник – "+display(record,"Науковий керівник"));
         supervisor.className = "supervisorLine"; cell.append(supervisor);
+        appendDoubleSupervision(cell,record);
       }
     }
     row.append(cell);
@@ -1321,6 +1329,7 @@ function openCard(selected) {
       const fact = el("div"), description = el("dd",value);
       if (field === "Науковий керівник") {
         fact.className = "supervisorFact";
+        appendDoubleSupervision(description,record);
         const edit = el("button",supervisorNames(record).length ? "Змінити" : "Додати");
         edit.type = "button"; edit.className = "editSupervisor"; edit.hidden = !canEdit();
         edit.setAttribute("aria-label","Змінити наукового керівника");
