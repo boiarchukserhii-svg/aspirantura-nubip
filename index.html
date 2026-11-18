@@ -2041,7 +2041,10 @@ function openWork(cardId,person) {
   $("workPerson").textContent = person;
   $("workError").textContent = "";
   const fields = $("workForm").elements;
-  fields.kind.value = active ? row.kind : "leave";
+  const isOnLeave = cards.some(card => card["ID картки"] === cardId && card["Контингент"] === LEAVE);
+  const reinstatement = fields.kind.querySelector('option[value="reinstatement"]');
+  reinstatement.hidden = reinstatement.disabled = !isOnLeave && !(active && row.kind === "reinstatement");
+  fields.kind.value = active ? row.kind : isOnLeave ? "reinstatement" : "leave";
   fields.stage.value = active ? row.stage : "collect";
   fields.nextDate.value = active ? row.nextDate : "";
   fields.note.value = active ? row.note : "";
@@ -2054,6 +2057,12 @@ async function saveWork(closed) {
   if (!draft || !workReady || sync.role !== "owner") return;
   const form = $("workForm");
   const fields = new FormData(form);
+  if (fields.get("kind") === "reinstatement"
+      && !cards.some(card => card["ID картки"] === draft.cardId && card["Контингент"] === LEAVE)
+      && !(workRows.get(draft.cardId)?.kind === "reinstatement" && !workRows.get(draft.cardId)?.closed)) {
+    $("workError").textContent = "Поновлення доступне для здобувачів в академічній відпустці.";
+    return;
+  }
   const buttons = [...form.querySelectorAll("button")];
   buttons.forEach(button => button.disabled = true);
   try {
