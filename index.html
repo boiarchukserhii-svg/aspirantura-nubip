@@ -206,7 +206,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
   <form id="workForm">
     <h2 id="workTitle">Робоча картка</h2>
     <p id="workPerson"></p>
-    <p><label>Тип справи <select name="kind" required><option value="leave">Академічна відпустка</option><option value="dismissal">Відрахування</option></select></label></p>
+    <p><label>Тип справи <select name="kind" required><option value="leave">Академічна відпустка</option><option value="dismissal">Відрахування</option><option value="reinstatement">Поновлення після академічної відпустки</option></select></label></p>
     <p><label>Етап <select name="stage" required><option value="collect">Збір документів</option><option value="draft">Підготовка наказу</option><option value="approval">На погодженні</option><option value="signed">Наказ видано</option></select></label></p>
     <p><label>Дата наступної дії <input name="nextDate" type="date"></label></p>
     <p><label>Службова примітка <textarea name="note" maxlength="2000" rows="3"></textarea></label></p>
@@ -1945,6 +1945,7 @@ let workUid = null;
 let workStop;
 let workDraft;
 const workLabels = {leave:"Академічна відпустка",dismissal:"Відрахування",
+  reinstatement:"Поновлення після академічної відпустки",
   collect:"Збір документів",draft:"Підготовка наказу",approval:"На погодженні",signed:"Наказ видано"};
 
 function updateWorkAccess() {
