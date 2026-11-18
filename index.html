@@ -571,10 +571,10 @@ function el(tag,text) {
   if (text != null) node.textContent = text;
   return node;
 }
-function countdown(days,study = null,todayLabel = null) {
+function countdown(days,study = null,todayLabel = null,dayTicks = [90,60,30,14,0]) {
   const box = el("div"), bar = el("progress"), ticks = el("div");
   box.className = "countdown";
-  const max = study?.[0].days ?? 90;
+  const max = study?.[0].days ?? dayTicks[0];
   box.dataset.band = days <= 0 ? 0 : study ? (days <= study[1].days ? "6m" : "9m")
     : LEAVE_WINDOWS.find(limit => days <= limit) ?? 90;
   const amount = Math.abs(days), last = amount % 10, teens = amount % 100 >= 11 && amount % 100 <= 14;
@@ -587,7 +587,7 @@ function countdown(days,study = null,todayLabel = null) {
   bar.setAttribute("aria-label",label);
   ticks.className = "countdownTicks";
   const milestones = study ? [...study.map(({days,months}) => [days,`${months} міс.`]),[0,""]]
-    : [90,60,30,14,0].map(day => [day,day ? String(day) : ""]);
+    : dayTicks.map(day => [day,day ? String(day) : ""]);
   ticks.append(...milestones.map(([day,text]) => {
     const tick = el("span",text);
     if (!day) tick.append(icon("bell"));
@@ -2022,7 +2022,7 @@ function renderWork() {
     edit.onclick = () => openWork(row.cardId,row.person);
     const days = workDaysUntil(row.nextDate,today);
     const deadline = days === null ? el("p","Дату наступної дії не зазначено")
-      : countdown(days,null,"Наступна дія сьогодні");
+      : countdown(days,null,"Наступна дія сьогодні",[30,14,7,0]);
     if (days !== null) deadline.dataset.urgent = days <= workReminderDays;
     item.append(title,details,deadline,edit);
     return item;
