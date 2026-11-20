@@ -1121,9 +1121,8 @@ function editStatus(record,editingIndex = null) {
     form.dataset.saving = "true";
     $("saveStatus").disabled = $("cancelStatus").disabled = true;
     try {
-      const saved = await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
-      showNotice(saved ? (entry.date > kyivDay() ? "Запланований наказ збережено. Поточний статус не змінено." : "Статус картки збережено.")
-        : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
+      await saveHistoryEdit(record,updated,entry.date > kyivDay()
+        ? "Запланований наказ збережено. Поточний статус не змінено." : "Статус картки збережено.",dialog);
     } catch (error) {
       alert(sync.api?.errorText(error) ?? error.message);
       return;
@@ -1131,20 +1130,32 @@ function editStatus(record,editingIndex = null) {
       delete form.dataset.saving;
       $("saveStatus").disabled = $("cancelStatus").disabled = false;
     }
-    dialog.close();
-    $("card").close();
-    openCard(updated);
   };
   dialog.showModal();
 }
 
-async function saveHistoryEdit(record,updated,message = "Історію картки оновлено.") {
+function rememberListPosition() {
+  const x = window.scrollX, y = window.scrollY;
+  const lists = [...document.querySelectorAll("section:not([hidden]) .scroll, section:not([hidden]) .archiveCardList")]
+    .filter(list => list.scrollTop || list.scrollLeft)
+    .map(list => [list,list.scrollLeft,list.scrollTop]);
+  return () => {
+    for (const [list,left,top] of lists) list.scrollTo({left,top,behavior:"instant"});
+    window.scrollTo({left:x,top:y,behavior:"instant"});
+  };
+}
+async function saveHistoryEdit(record,updated,message = "Історію картки оновлено.",editor = null) {
   if (!canEdit()) throw Error("Змінювати спільний реєстр може лише власник.");
   const latest = cards.find(card => card["ID картки"] === record["ID картки"]);
   if (JSON.stringify(latest) !== JSON.stringify(record)) throw Error("Цю картку вже оновлено. Відкрийте її з реєстру повторно.");
-  const saved = await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card));
-  showNotice(saved ? message : "Зміни внесено у вкладці. Збережіть копію реєстру.",!saved);
-  if ($("card").open) openCard(updated);
+  const restorePosition = rememberListPosition();
+  await saveCards(cards.map(card => card["ID картки"] === record["ID картки"] ? updated : card),false,true);
+  showNotice(message);
+  if (!editor || editor.open) {
+    editor?.close();
+    if ($("card").open && selectedProfile?.["ID картки"] === record["ID картки"]) $("card").close();
+    restorePosition();
+  }
 }
 function editSupervisor(record) {
   if (!canEdit()) return;
@@ -1160,8 +1171,7 @@ function editSupervisor(record) {
     form.dataset.saving = "true"; errorBox.hidden = true;
     $("saveSupervisor").disabled = $("cancelSupervisor").disabled = true;
     try {
-      await saveHistoryEdit(record,{...record,"Науковий керівник":value},"Наукового керівника збережено");
-      dialog.close();
+      await saveHistoryEdit(record,{...record,"Науковий керівник":value},"Наукового керівника збережено",dialog);
     } catch (error) { errorBox.textContent = sync.api?.errorText(error) ?? error.message; errorBox.hidden = false; }
     finally { delete form.dataset.saving; $("saveSupervisor").disabled = $("cancelSupervisor").disabled = false; }
   };
@@ -1202,8 +1212,7 @@ function editDiploma(record) {
     $("saveDiploma").disabled = $("cancelDiploma").disabled = true;
     errorBox.hidden = true;
     try {
-      await saveHistoryEdit(record,{...record,diploma},"Реквізити диплома збережено.");
-      dialog.close();
+      await saveHistoryEdit(record,{...record,diploma},"Реквізити диплома збережено.",dialog);
     } catch (error) {
       errorBox.textContent = sync.api?.errorText(error) ?? error.message;
       errorBox.hidden = false;
@@ -1238,8 +1247,7 @@ function correctOrder(record,index,currentOrder) {
     $("saveOrder").disabled = $("closeOrder").disabled = true;
     errorBox.hidden = true;
     try {
-      await saveHistoryEdit(record,{...record,manualStatus:true,statusHistory:[...record.statusHistory,entry]});
-      dialog.close();
+      await saveHistoryEdit(record,{...record,manualStatus:true,statusHistory:[...record.statusHistory,entry]}, "Реквізити наказу збережено.",dialog);
     } catch (error) {
       errorBox.textContent = sync.api?.errorText(error) ?? error.message;
       errorBox.hidden = false;
@@ -1526,20 +1534,20 @@ function openNewCard() {
   };
   dialog.showModal();
 }
-function setCards(next,reset = false) {
+function setCards(next,reset = false,preserveFilters = false) {
   cards = next.map(card => applyScheduledOrders(card)).map(card => card["Джерело фінансування"] === "Проектна аспірантура"
     ? {...card,"Джерело фінансування":"Проєктна аспірантура"} : card);
   if (reset) filters.clear();
-  else pruneFilters(filters);
+  else if (!preserveFilters) pruneFilters(filters);
   if (reset) $("search").value = "";
   if (reset) $("archiveSearch").value = "";
   if (reset) archiveFilters.clear();
-  else pruneFilters(archiveFilters,true);
+  else if (!preserveFilters) pruneFilters(archiveFilters,true);
   updateWriteControls();
   renderMetrics(); renderRegistry(); renderCalendar();
   if (!$("archive").hidden) renderArchive();
 }
-async function saveCards(next,transfer = false) {
+async function saveCards(next,transfer = false,profileEdit = false) {
   if (sync.uid) {
     if (sync.role !== "owner") throw Error("Спільний реєстр доступний лише для перегляду.");
     if (!sync.ready || sync.revision === null || sync.busy) throw Error("Дочекайтеся підключення або завершення синхронізації.");
@@ -1554,7 +1562,7 @@ async function saveCards(next,transfer = false) {
       if (sync.uid !== uid) throw Error("Обліковий запис змінився.");
       if (revision >= sync.revision) {
         sync.revision = revision;
-        setCards(next);
+        setCards(next,false,profileEdit);
       }
       updateSyncControls("Реєстр синхронізовано");
       return true;
@@ -1565,6 +1573,11 @@ async function saveCards(next,transfer = false) {
       sync.busy = false;
       updateSyncControls();
     }
+  }
+  if (profileEdit) {
+    localStorage.setItem(storageKey,JSON.stringify(next));
+    setCards(next,false,true);
+    return true;
   }
   setCards(next);
   try {
@@ -1685,11 +1698,11 @@ async function setupSync() {
         }
         updateSyncControls("Підключаємо спільний реєстр…");
         sync.unsubscribe = api.subscribe(({cards:remote,revision}) => {
-          if (sync.uid !== uid || sync.role !== role || (sync.revision !== null && revision < sync.revision)) return;
+          if (sync.uid !== uid || sync.role !== role || (sync.revision !== null && revision <= sync.revision)) return;
           const needsTransfer = role === "owner" && revision === 0 && localCards().length;
           sync.revision = revision;
           sync.ready = true;
-          setCards(needsTransfer ? localCards() : decodeBackup(remote));
+          setCards(needsTransfer ? localCards() : decodeBackup(remote),false,sync.busy && $("card").open);
           updateSyncControls(needsTransfer ? "Спільний реєстр порожній. Перенесіть локальну копію один раз."
             : role === "viewer" ? "Спільний реєстр · перегляд" : "Реєстр синхронізовано");
         },fail);
@@ -2060,6 +2073,7 @@ async function saveWork(closed) {
     $("workError").textContent = "Поновлення доступне для здобувачів в академічній відпустці.";
     return;
   }
+  const restorePosition = rememberListPosition();
   const buttons = [...form.querySelectorAll("button")];
   buttons.forEach(button => button.disabled = true);
   try {
@@ -2067,8 +2081,8 @@ async function saveWork(closed) {
       nextDate:fields.get("nextDate"),note:fields.get("note").trim(),closed});
     if (workDraft !== draft) return;
     $("workDialog").close();
-    $("card").close();
-    $("workTab").click();
+    if ($("card").open && selectedProfile?.["ID картки"] === draft.cardId) $("card").close();
+    restorePosition();
   } catch (error) {
     if (workDraft === draft) $("workError").textContent = sync.api.errorText(error);
   } finally {
