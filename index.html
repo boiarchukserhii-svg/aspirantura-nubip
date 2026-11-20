@@ -799,8 +799,12 @@ function shortCardRow(record) {
     } else {
       cell.textContent = display(record,field);
       if (field === "Спеціальність") {
-        const supervisor = el("p","Науковий керівник – "+display(record,"Науковий керівник"));
-        supervisor.className = "supervisorLine"; cell.append(supervisor);
+        const names = supervisorNames(record);
+        for (const name of names.length ? names : ["Не зазначено"]) {
+          const supervisor = el("p","Науковий керівник – "+name);
+          supervisor.className = "supervisorLine";
+          cell.append(supervisor);
+        }
         appendDoubleSupervision(cell,record);
       }
     }
@@ -1340,18 +1344,28 @@ function openCard(selected) {
     $("profileBadges").replaceChildren(badge,form,funding);
     const factFields = [["Початок навчання","Початок навчання"],["Завершення навчання","Завершення навчання"],
       ["Спеціальність","Спеціальність"],["Науковий керівник","Науковий керівник"],["Освітня програма","Освітньо-наукова програма"]];
-    $("profileFacts").replaceChildren(...factFields.map(([field,label]) => {
-      const value = field === "Освітня програма" ? record[field] || "Потребує уточнення" : display(record,field);
-      const fact = el("div"), description = el("dd",value);
-      if (field === "Науковий керівник") {
-        fact.className = "supervisorFact";
-        appendDoubleSupervision(description,record);
-        const edit = el("button",supervisorNames(record).length ? "Змінити" : "Додати");
-        edit.type = "button"; edit.className = "editSupervisor"; edit.hidden = !canEdit();
-        edit.setAttribute("aria-label","Змінити наукового керівника");
-        edit.onclick = () => editSupervisor(record); description.append(edit);
+    $("profileFacts").replaceChildren(...factFields.flatMap(([field,label]) => {
+      if (field !== "Науковий керівник") {
+        const value = field === "Освітня програма" ? record[field] || "Потребує уточнення" : display(record,field);
+        const fact = el("div");
+        fact.append(el("dt",label),el("dd",value));
+        return [fact];
       }
-      fact.append(el("dt",label),description); return fact;
+      const names = supervisorNames(record);
+      return (names.length ? names : ["Не зазначено"]).map((name,index) => {
+        const fact = el("div"), description = el("dd",name);
+        fact.className = "supervisorFact";
+        if (index === 0) {
+          appendDoubleSupervision(description,record);
+          const edit = el("button",names.length ? "Змінити" : "Додати");
+          edit.type = "button"; edit.className = "editSupervisor"; edit.hidden = !canEdit();
+          edit.setAttribute("aria-label","Змінити наукового керівника");
+          edit.onclick = () => editSupervisor(record);
+          description.append(edit);
+        }
+        fact.append(el("dt",label),description);
+        return fact;
+      });
     }));
     const deadline = $("profileDeadline");
     deadline.hidden = currentStatus === COMPLETED || currentStatus === DISMISSED;
