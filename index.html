@@ -260,6 +260,7 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <dialog id="card">
 <div class="profileHead"><div><h2 id="person"></h2><p id="profileLine"></p><div id="profileBadges" class="profileBadges"></div></div><div class="profileActions"><button class="cardClose" id="closeCard">Закрити</button><div class="profileCardNumber"><span>№ картки</span><strong id="profileCardNumber"></strong></div></div></div>
 <div class="toolbar" id="cardTabs"></div><dl id="profileFacts" class="profileFacts"></dl>
+<button id="editCardDetails" type="button" aria-haspopup="dialog" hidden>Редагувати облікові дані</button>
 <section class="deadlineBox" id="profileDeadline"></section>
 <section class="scheduledNotice" id="profileScheduled" hidden aria-label="Запланований наказ"></section>
 <section class="diplomaBlock" id="profileDiploma" aria-labelledby="profileDiplomaTitle" hidden>
@@ -301,6 +302,13 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 <div class="statusFormActions"><button type="button" id="closeOrder">Скасувати</button><button type="submit" id="saveOrder" class="primary">Зберегти зміни</button></div>
 </form>
 </dialog>
+<dialog id="cardDetailsDialog" aria-labelledby="cardDetailsTitle">
+<h2 id="cardDetailsTitle">Облікові дані картки</h2>
+<form id="cardDetailsForm" class="statusForm">
+<div id="cardDetailsFields" class="profileFacts"></div>
+<p id="cardDetailsError" role="alert" hidden></p>
+<div class="statusFormActions"><button type="button" id="cancelCardDetails">Скасувати</button><button type="submit" id="saveCardDetails" class="primary">Зберегти зміни</button></div>
+</form></dialog>
 <dialog id="diplomaDialog" aria-labelledby="diplomaTitle">
 <h2 id="diplomaTitle">Видати диплом</h2>
 <form id="diplomaForm" class="statusForm">
@@ -1181,6 +1189,69 @@ function editSupervisor(record) {
   };
   dialog.showModal(); input.focus();
 }
+const editableDetails = [
+  {field:"Курс",label:"Курс навчання",numeric:true},
+  {field:"Структурний підрозділ",label:"Факультет/ННІ"},
+  {field:"Спеціальність",label:"Спеціальність"},
+  {field:"Освітня програма",label:"ОНП"},
+  {field:"ID ОП",label:"Ідентифікатор ОНП",numeric:true},
+  {field:"Форма навчання",label:"Форма навчання"},
+  {field:"Джерело фінансування",label:"Джерело фінансування"}
+];
+const canEditCardDetails = () => sync.role === "owner" && sync.ready;
+function manualDetails(card) {
+  const fields = Array.isArray(card?.manualCardFields) ? card.manualCardFields : [];
+  return editableDetails.map(({field}) => field).filter(field => fields.includes(field));
+}
+function editCardDetails(record) {
+  if (!record || !canEditCardDetails()) return;
+  const dialog=$("cardDetailsDialog"), form=$("cardDetailsForm"), errorBox=$("cardDetailsError");
+  const submit=$("saveCardDetails"), cancel=$("cancelCardDetails");
+  errorBox.hidden=true;
+  submit.disabled=cancel.disabled=false;
+  $("cardDetailsFields").replaceChildren(...editableDetails.map(({field,label,numeric},index) => {
+    const wrapper=el("label",label),input=el("input");
+    input.name=field;
+    input.value=record[field]??"";
+    if(numeric) {
+      input.type="number";input.min="1";input.step="1";
+      wrapper.append(input);
+    } else {
+      input.maxLength=240;
+      const options=el("datalist");
+      options.id="cardDetailsOptions"+index;
+      input.setAttribute("list",options.id);
+      const values=[...new Set(cards.map(card=>String(card[field]??"").trim()).filter(Boolean))].sort(collator.compare);
+      options.append(...values.map(value=>{const option=el("option");option.value=value;return option;}));
+      wrapper.append(input,options);
+    }
+    return wrapper;
+  }));
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    if(submit.disabled||!canEditCardDetails())return;
+    errorBox.hidden=true;
+    const updated={...record},changed=[];
+    try {
+      for(const {field,label,numeric} of editableDetails){
+        const value=form.elements.namedItem(field).value.trim();
+        if(value===String(record[field]??"").trim())continue;
+        const normalized=value?(numeric?Number(value):value):null;
+        if(numeric&&normalized!==null&&(!Number.isSafeInteger(normalized)||normalized<1)){
+          throw Error("Вкажіть додатне ціле число в полі «"+label+"»");
+        }
+        updated[field]=normalized;
+        changed.push(field);
+      }
+      if(!changed.length){dialog.close();return;}
+      updated.manualCardFields=[...new Set([...manualDetails(record),...changed])];
+      submit.disabled=cancel.disabled=true;
+      await saveHistoryEdit(record,updated,"Облікові дані збережено",dialog);
+    } catch(error){errorBox.textContent=sync.api?.errorText(error)??error.message;errorBox.hidden=false;}
+    finally{submit.disabled=cancel.disabled=false;}
+  };
+  dialog.showModal();
+}
 let selectedProfile = null;
 function canEditDiploma(record) {
   return !record.diploma && !pendingScheduled(record) && [ACTIVE,LEAVE,COMPLETED].includes(record["Контингент"]);
@@ -1626,6 +1697,7 @@ function updateProfileActions() {
   $("profileStatusTools").hidden = $("changeStatus").hidden = !show;
   $("takeWork").hidden = !selectedProfile || !workReady || sync.role !== "owner";
   $("editDiploma").hidden = !show || !canEditDiploma(selectedProfile);
+  $("editCardDetails").hidden = !selectedProfile || !canEditCardDetails();
 }
 function updateWriteControls() {
   const editable = canEdit();
@@ -1636,6 +1708,7 @@ function updateWriteControls() {
 }
 function clearSharedView() {
   selectedProfile = null;
+  $("cardDetailsDialog").close();
   $("supervisorDialog").close(); $("supervisorForm").reset();
   $("newCardDialog").close();
   $("newCardForm").reset();
@@ -1741,6 +1814,11 @@ function mergeCards(incoming,preserveManual,protectHistory = false) {
     if (old && Object.hasOwn(old,"Науковий керівник") && (preserveManual || !Object.hasOwn(card,"Науковий керівник"))) {
       incomingCard = {...incomingCard,"Науковий керівник":old["Науковий керівник"]};
     }
+    const manualFields = manualDetails(old);
+    if (preserveManual && manualFields.length) {
+      incomingCard = {...incomingCard,manualCardFields:manualFields};
+      for (const field of manualFields) incomingCard[field] = old[field] ?? null;
+    }
     if (protectHistory && old?.manualStatus) {
       const before = old.statusHistory ?? [], after = card.statusHistory ?? [];
       if (before.some((entry,index) => JSON.stringify(entry) !== JSON.stringify(after[index]))
@@ -1812,6 +1890,9 @@ function decodeBackup(data) {
   return data;
 }
 function setup() {
+  $("editCardDetails").onclick = () => editCardDetails(selectedProfile);
+  $("cancelCardDetails").onclick = () => $("cardDetailsDialog").close();
+  $("cardDetailsDialog").addEventListener("cancel",event => { if ($("saveCardDetails").disabled) event.preventDefault(); });
   $("cancelSupervisor").onclick = () => $("supervisorDialog").close();
   $("supervisorDialog").addEventListener("cancel",event => { if ($("saveSupervisor").disabled) event.preventDefault(); });
   $("addCard").onclick = openNewCard;
