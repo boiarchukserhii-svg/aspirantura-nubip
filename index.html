@@ -64,8 +64,12 @@ body{background:#f3f7fc;color:#203752}header{background:#edf3fb;color:#182e4c;bo
 @media(max-width:760px){.appMark{width:28px;height:28px;border-radius:6px}}
 .metrics .metric{border:0;border-radius:19px;background:#e5efff;color:#627681}
 .metrics .metric:nth-child(2){background:#e5f0ff}.metrics .metric:nth-child(3){background:#f0eafb}.metrics .metric:nth-child(4){background:#fff0e6}
+.metrics .metric[data-archive-status="completed"]{background:#e7f4ec}
+.metrics .metric[data-archive-status="dismissed"]{background:#fbeceb}
 .metrics .metric strong{color:#253e4b}.metrics .metric .metricIcon{color:#195bb5}
 .metrics .metric:nth-child(2) .metricIcon{color:#467cba}.metrics .metric:nth-child(3) .metricIcon{color:#8960b4}.metrics .metric:nth-child(4) .metricIcon{color:#a56233}
+.metrics .metric[data-archive-status="completed"] .metricIcon{color:#26734d}
+.metrics .metric[data-archive-status="dismissed"] .metricIcon{color:#9f382f}
 .metrics .metric:hover{box-shadow:0 0 0 2px #88b2ea}.metrics .metric[aria-pressed=true]{box-shadow:inset 0 0 0 2px #195bb5}
 .filters label,.mobileSort{display:block;background:#f2f6fc;border:1px solid #dce6f1;border-radius:10px;padding:7px 9px;font-size:12px;font-weight:650;min-width:0}
 .filters select,.mobileSort select{font-size:12px;padding:6px 7px}
@@ -746,7 +750,7 @@ function renderMetrics() {
     grouped:index === 0 || index === 2,
     date:index === 1 ? card => card["Статус по"] : index === 3 ? card => attention.get(card["ID картки"]) : null
   }));
-  $("metrics").replaceChildren(...values.map(([records,label,symbol],index) => {
+  const recentMetrics=values.map(([records,label,symbol],index) => {
     const box = el("button"), caption = el("span");
     box.type = "button";
     box.className = "metric";
@@ -766,7 +770,21 @@ function renderMetrics() {
     if (index === 2) box.title = `Завершують у ${COMPLETION_YEAR} році`;
     box.append(icon(symbol,"metricIcon"),el("strong",count(records.length)),caption);
     return box;
-  }));
+  });
+  const archiveMetrics=[
+    [COMPLETED,"Завершили навчання","cap","completed"],
+    [DISMISSED,"Відраховані","person","dismissed"]
+  ].map(([status,label,symbol,key])=>{
+    const box=el("button");
+    box.type="button";
+    box.className="metric";
+    box.dataset.archiveStatus=key;
+    box.setAttribute("aria-controls","archive");
+    box.append(icon(symbol,"metricIcon"),el("strong",count(cards.filter(card=>card["Контингент"]===status).length)),el("span",label));
+    box.onclick=()=>openArchiveCategory(status);
+    return box;
+  });
+  $("metrics").replaceChildren(...recentMetrics,...archiveMetrics);
   const courses = new Map([1,2,3,4].map(course => [course,0]));
   for (const card of active) {
     const course = card["Курс"];
@@ -824,6 +842,18 @@ const archiveCategories = [["archiveCompleted",COMPLETED],["archiveDismissed",DI
 const mobileLayout = matchMedia("(max-width:760px)");
 let archiveStatus = COMPLETED;
 let archiveExpanded = false;
+function openArchiveCategory(status){
+  const category=archiveCategories.find(([,value])=>value===status)[0];
+  archiveStatus=status;
+  archiveExpanded=true;
+  $("archiveSearch").value="";
+  archiveFilters.clear();
+  $("archiveTab").click();
+  const target=mobileLayout.matches?$(category):$(category+"Rows").closest(".calendarSection").querySelector("h3");
+  if(!mobileLayout.matches)target.tabIndex=-1;
+  target.focus({preventScroll:true});
+  target.scrollIntoView({block:"start"});
+}
 function renderArchive() {
   const mobile = mobileLayout.matches;
   const content = $("archiveContent");
@@ -866,7 +896,7 @@ function renderRegistry() {
   const group = selectedMetric === null ? null : metricGroups[selectedMetric];
   $("metricSelection").hidden = !group;
   $("metricSelectionLabel").textContent = group?.label ?? "";
-  [...$("metrics").children].forEach((button,index) => button.setAttribute("aria-pressed",String(index === selectedMetric)));
+  [...$("metrics").querySelectorAll("button[aria-pressed]")].forEach((button,index) => button.setAttribute("aria-pressed",String(index === selectedMetric)));
   const matches = sectionCards(false).filter(card => (!group || group.ids.has(card["ID картки"]))
     && String(display(card,"Здобувач")).toLocaleLowerCase("uk").includes(query)
     && [...filters].every(([field,value]) => matchesFilter(card,field,value)));
