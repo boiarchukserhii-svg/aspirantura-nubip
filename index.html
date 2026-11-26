@@ -1191,6 +1191,7 @@ function editSupervisor(record) {
 }
 const editableDetails = [
   {field:"Курс",label:"Курс навчання",numeric:true},
+  {field:"Завершення навчання",label:"Дата завершення навчання",date:true},
   {field:"Структурний підрозділ",label:"Факультет/ННІ"},
   {field:"Спеціальність",label:"Спеціальність"},
   {field:"Освітня програма",label:"ОНП"},
@@ -1209,11 +1210,14 @@ function editCardDetails(record) {
   const submit=$("saveCardDetails"), cancel=$("cancelCardDetails");
   errorBox.hidden=true;
   submit.disabled=cancel.disabled=false;
-  $("cardDetailsFields").replaceChildren(...editableDetails.map(({field,label,numeric},index) => {
+  $("cardDetailsFields").replaceChildren(...editableDetails.map(({field,label,numeric,date},index) => {
     const wrapper=el("label",label),input=el("input");
     input.name=field;
-    input.value=record[field]??"";
-    if(numeric) {
+    if(date) {
+      input.type="date";
+      if(record["Початок навчання"])input.min=record["Початок навчання"];
+      wrapper.append(input);
+    } else if(numeric) {
       input.type="number";input.min="1";input.step="1";
       wrapper.append(input);
     } else {
@@ -1225,6 +1229,7 @@ function editCardDetails(record) {
       options.append(...values.map(value=>{const option=el("option");option.value=value;return option;}));
       wrapper.append(input,options);
     }
+    input.value=record[field]??"";
     return wrapper;
   }));
   form.onsubmit=async event=>{
@@ -1233,12 +1238,15 @@ function editCardDetails(record) {
     errorBox.hidden=true;
     const updated={...record},changed=[];
     try {
-      for(const {field,label,numeric} of editableDetails){
+      for(const {field,label,numeric,date} of editableDetails){
         const value=form.elements.namedItem(field).value.trim();
         if(value===String(record[field]??"").trim())continue;
         const normalized=value?(numeric?Number(value):value):null;
         if(numeric&&normalized!==null&&(!Number.isSafeInteger(normalized)||normalized<1)){
           throw Error("Вкажіть додатне ціле число в полі «"+label+"»");
+        }
+        if(date&&normalized&&record["Початок навчання"]&&normalized<record["Початок навчання"]){
+          throw Error("Дата завершення навчання не може передувати даті початку");
         }
         updated[field]=normalized;
         changed.push(field);
